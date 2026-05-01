@@ -8,51 +8,141 @@ import { sendObj } from "./send";
 
 function App() {
   const token = localStorage.getItem('token');
+  const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
   const [loading, setLoading] = useState<boolean>(() => !token);
   const [cpfCnpjDestinatario, setCpfCnpjDestinatario] = useState<string>('');
   const [cpfCnpjRemetente, setCpfCnpjRemetente] = useState<string>('');
   const [quantidadeCarga, setQuantidadeCarga] = useState<string>('0');
   const [valorCarga, setValorCarga] = useState<string>('0');
   const [valorServico, setValorServico] = useState<string>('0');
-  const [valorReceber, setValorReceber] = useState<string>('0');
   const [unidCarga, setUnidCarga] = useState<string>('');
+  const [xmlFile, setXmlFile] = useState<File | null>(null);
+  const [produtoPredominante, setProdutoPredominante] = useState<string>('');
+  const [placaVeiculoTração, setPlacaVeiculoTração] = useState<string>('');
+  const [motorista, setMotorista] = useState<string>('')
+  const [veiculoNome, setVeiculoNome] = useState('')
+  const [motoristaNome, setMotoristaNome] = useState('')
+  const [remeteneNome, setRemetenteNome] = useState('')
+  const [destinatarioNome, setDestinatarioNome] = useState('')
+  const [numeroNotaFiscal, setNumeroNotaFiscal] = useState<string>('')
+  const [chaveNotaFiscal, setChaveNotaFiscal] = useState<string>('')
 
-  //   async function buscarCnpj(cnpj) {
-  //     try {
-  //         // Remove caracteres não numéricos do CNPJ
-  //         const cnpjLimpo = cnpj.replace(/\D/g, '');
+  const processarXML = (xmlContent: string) => {
+    try {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
 
-  //         if (cnpjLimpo.length !== 14) {
-  //             console.log('CNPJ incompleto, aguardando...');
-  //             return;
-  //         }
+      const dest = xmlDoc.querySelector("dest");
+      if (dest) {
+        const cpfCnpjDest = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
+        if (cpfCnpjDest) {
+          formatarCpfCnpj(cpfCnpjDest, 'destinatario');
+        }
+      }
 
-  //         showNotification('🔍 Buscando dados do CNPJ...', 'info');
+      const emit = xmlDoc.querySelector("emit");
+      if (emit) {
+        const cpfCnpjRem = emit.querySelector("CPF")?.textContent || emit.querySelector("CNPJ")?.textContent || "";
+        if (cpfCnpjRem) {
+          formatarCpfCnpj(cpfCnpjRem, 'Remetente');
+        }
+      }
 
-  //         // API BrasilAPI (gratuita e confiável)
-  //         const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
+      const prod = xmlDoc.querySelectorAll("prod");
+      const vol = xmlDoc.querySelector("vol");
+      const ide = xmlDoc.querySelector("ide");
 
-  //         if (!response.ok) {
-  //             throw new Error('CNPJ não encontrado na base de dados');
-  //         }
+      // Extrair número e chave da nota fiscal
+      if (ide) {
+        const nNF = ide.querySelector("nNF")?.textContent || "";
+        const chave = xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
+        setNumeroNotaFiscal(nNF);
+        setChaveNotaFiscal(chave);
+      }
 
-  //         const data = await response.json();
+      let produto = "";
+      if (vol) {
+        produto = vol.querySelector("esp")?.textContent || "";
+      }
 
-  //         document.getElementById('dest_razao_social').value = data.razao_social || '';
-  //         document.getElementById('dest_cep').value = data.cep || '';
-  //         document.getElementById('dest_rua').value = data.logradouro || '';
-  //         document.getElementById('dest_numero').value = data.numero || '';
-  //         document.getElementById('dest_bairro').value = data.bairro || '';
-  //         document.getElementById('dest_cidade').value = data.municipio || '';
-  //         document.getElementById('dest_insc_estadual').focus();
+      if (produto) {
+        const ultimasDuasLetras = produto.slice(-2);
+        setUnidCarga(ultimasDuasLetras);
 
-  //         showNotification('✅ Dados do CNPJ preenchidos com sucesso!', 'success');
+        setProdutoPredominante(produto);
+      }
 
-  //     } catch (error) {
-  //         console.error('Erro ao buscar CNPJ:', error);
-  //         showNotification('❌ CNPJ não encontrado. Preencha os dados manualmente.', 'error');
-  //     }
-  // }
+      let totalValor = 0;
+      prod.forEach(p => {
+        const vProd = parseFloat(p.querySelector("vProd")?.textContent?.replace(',', '.') || "0");
+        totalValor += vProd;
+      });
+      if (totalValor > 0) {
+        setValorCarga(totalValor.toFixed(2));
+        sendObj.VALORCARGA = totalValor;
+      }
+
+      if (vol) {
+        const qVol = vol.querySelector("pesoL")?.textContent || "0";
+        const esp = vol.querySelector("esp")?.textContent || "";
+
+        const unidade = esp.split(' ')[0] || "";
+
+        setQuantidadeCarga(qVol);
+        sendObj.VALORCARGAAVERB = parseFloat(qVol.replace(',', '.')) || 0;
+        sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(qVol.replace(',', '.')) || 0;
+        sendObj.CARGAQTD[0].DESCMEDIDA = esp;
+        sendObj.CARGAQTD[0].DESCUNIDADE = unidade;
+      } else if (prod.length > 0) {
+        const firstProd = prod[0];
+        const qCom = firstProd.querySelector("pesoL")?.textContent || "0";
+        const uCom = firstProd.querySelector("uCom")?.textContent || "";
+        setQuantidadeCarga(qCom);
+        sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(qCom.replace(',', '.')) || 0;
+        sendObj.VALORCARGAAVERB = parseFloat(qCom.replace(',', '.')) || 0;
+        sendObj.CARGAQTD[0].DESCMEDIDA = uCom;
+        sendObj.CARGAQTD[0].DESCUNIDADE = uCom;
+      }
+
+      const chNFe = xmlDoc.querySelector("chNFe")?.textContent || xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
+      if (chNFe) {
+        sendObj.DOCNFE = [{
+          IDENT: 0,
+          IDCTE: 0,
+          CHAVENFE: chNFe,
+          VALORNFE: null,
+          PESOB: null,
+          PESOL: null,
+          PIN: null,
+          DATAPREVENTREGA: null,
+          PITEM: 0,
+          NNF: xmlDoc.querySelector("nNF")?.textContent || "",
+          NCM: null,
+          DESCPRODUTO: null
+        }];
+      }
+
+      console.log("Dados extraídos do XML com sucesso!");
+    } catch (error) {
+      console.error("Erro ao processar XML:", error);
+      alert("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === "text/xml") {
+      setXmlFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const xmlContent = e.target?.result as string;
+        processarXML(xmlContent);
+      };
+      reader.readAsText(file);
+    } else {
+      alert("Por favor, selecione um arquivo XML válido.");
+    }
+  };
 
   function formatarCpfCnpj(input: string, path: string) {
     let value = input.replace(/\D/g, '');
@@ -93,6 +183,8 @@ function App() {
       setCpfCnpjDestinatario(formattedValue);
     } else if (path === 'Remetente') {
       setCpfCnpjRemetente(formattedValue);
+    } else if (path === 'motorista') {
+      setMotorista(formattedValue);
     }
 
     // Se for CNPJ completo (18 caracteres formatados), busca automático
@@ -100,9 +192,8 @@ function App() {
       // buscarCnpj(formattedValue);
     }
   }
-  // 07.332.190/0007-89
   const loadingData = async () => {
-    const [destinatario, Remetente, CargaQTD] = await Promise.all([
+    const [destinatario, Remetente, CargaQTD, VeiculoTração, VeiculoMotorista] = await Promise.all([
       axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
         "search": cpfCnpjDestinatario,
         "id": null,
@@ -133,6 +224,25 @@ function App() {
           headers: {
             'Authorization': 'Bearer ' + token,
           }
+        }),
+      axios.get("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GVEICULO", {
+        params: {
+          "search": placaVeiculoTração,
+          "tipoVeiculo": "T"
+        },
+        headers: {
+          'Authorization': 'Bearer ' + token,
+        }
+      }),
+      axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
+        "search": motorista,
+        "id": null,
+        "propertyList": []
+      },
+        {
+          headers: {
+            'Authorization': 'Bearer ' + token,
+          }
         })
     ]);
     sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
@@ -140,6 +250,37 @@ function App() {
     sendObj.CARGAQTD[0].DESCMEDIDA = CargaQTD.data[0].DESCRICAO;
     sendObj.CARGAQTD[0].DESCUNIDADE = CargaQTD.data[0].DESCRICAO.split(' - ')[1];
     sendObj.CARGAQTD[0].QUANTIDADE = 1;
+    sendObj.DESCCARGA = produtoPredominante;
+    sendObj.TIPOCARGA = produtoPredominante;
+    sendObj.Veiculos[0] = {
+      ...sendObj.Veiculos[0],
+      IDENT: VeiculoTração.data[0].IDENT,
+      RENAVAN: VeiculoTração.data[0].RENAVAN,
+      PLACA: VeiculoTração.data[0].PLACA,
+      TARA: VeiculoTração.data[0].TARA,
+      CAPACIDADEKG: VeiculoTração.data[0].CAPACIDADEKG,
+      CAPACIDADEM3: VeiculoTração.data[0].CAPACIDADEM3,
+      PROPRIO: VeiculoTração.data[0].PROPRIO,
+      TIPOVEICULO: VeiculoTração.data[0].TIPOVEICULO,
+      TIPORODADO: VeiculoTração.data[0].TIPORODADO,
+      TIPOCARROCERIA: VeiculoTração.data[0].TIPOCARROCERIA,
+      UFLICENCIADO: VeiculoTração.data[0].UFLICENCIADO,
+      CPFCNPJ: VeiculoTração.data[0].CPFCNPJ,
+      RNTC: VeiculoTração.data[0].RNTC,
+      NOMEPROPRIETARIO: VeiculoTração.data[0].NOMEPROPRIETARIO,
+      INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
+      UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
+      TIPOPROPRIETARIO: VeiculoTração.data[0].TIPOPROPRIETARIO,
+      IDVEICULO: VeiculoTração.data[0].IDVEICULO
+    }
+    sendObj.IDVEICULO = VeiculoTração.data[0].IDVEICULO
+    sendObj.IDMOTORISTA = VeiculoMotorista.data[0].IDCADASTRO
+    sendObj.DOCNFE[0].CHAVENFE = chaveNotaFiscal
+    sendObj.DOCNFE[0].NNF = numeroNotaFiscal
+    setDestinatarioNome(destinatario.data[0].NOME)
+    setRemetenteNome(Remetente.data[0].NOME)
+    setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
+    setMotoristaNome(VeiculoMotorista.data[0].NOME)
     console.log(sendObj);
   }
   const getToken = async () => {
@@ -188,34 +329,336 @@ function App() {
     );
   }
 
-  //IDRemetente,VALORRECEBER,VALORSERVICO,VALORCARGA,DESCCARGA,TIPOCARGA,
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl shadow-xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
-              <h1 className="text-3xl font-bold text-white text-center">Sistema ESG</h1>
-              <p className="text-blue-100 text-center mt-2">Preencha os dados para gerar o CTe</p>
+          <div className="bg-white shadow-xl rounded-lg overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+              <h1 className="text-2xl font-bold text-white">CT-e EGS</h1>
             </div>
 
-            <form className="p-8 space-y-6">
+            {/* Upload de XML */}
+            <div className="p-6">
+              <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
+                <div className="text-center">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar XML</h3>
+                    <p className="text-sm text-gray-600 mb-4">Carregue um arquivo XML para preencher automaticamente os dados</p>
+                  </div>
 
-              <div className="space-y-8">
-                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  <div className="border-t border-gray-200 pt-4">
+                    <label htmlFor="xml-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
+
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+
+                        <p className="mb-2 text-sm text-gray-600">
+                          <span className="font-semibold text-blue-600">Clique para selecionar</span> ou arraste o arquivo XML aqui
+                        </p>
+                        <p className="text-xs text-gray-500">Apenas arquivos .xml (máx. 10MB)</p>
+                      </div>
+                      <input
+                        id="xml-upload"
+                        name="xml-upload"
+                        type="file"
+                        accept=".xml"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onChange={handleFileUpload}
+                      />
+                    </label>
+                  </div>
+
+                  {xmlFile && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center">
+                        <svg className="h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-green-800">
+                          Arquivo carregado: <span className="font-semibold">{xmlFile.name}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setXmlFile(null)}
+                          className="ml-auto text-sm text-red-600 hover:text-red-800 transition-colors"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Navegação por Abas */}
+              <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                  <button
+                    type="button"
+                    onClick={() => setTab("identificação")}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "identificação"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      }`}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 016 0zm-4 0a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    Dados das Partes
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    Identificação
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("Comp/Tributos")}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "Comp/Tributos"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      }`}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zM9 5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Componentes/Tributos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("documentos")}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "documentos"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      }`}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zM9 5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Documentos
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            <form>
+              {tab === "identificação" && (
+                <div className="space-y-8">
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                      </svg>
+                      Dados das Partes
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label htmlFor="Remetente" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                          </svg>
+                          Remetente CPF/CNPJ
+                        </label>
+                        <input
+                          type="text"
+                          value={cpfCnpjRemetente}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            formatarCpfCnpj(e.target.value, 'Remetente');
+                          }}
+                          id="Remetente"
+                          name="Remetente"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="00.000.000/0000-00"
+                        />
+                        <span className="text-sm text-gray-500">{remeteneNome}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="destinatario" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+                          </svg>
+                          Destinatário CPF/CNPJ
+                        </label>
+                        <input
+                          type="text"
+                          value={cpfCnpjDestinatario}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            formatarCpfCnpj(e.target.value, 'destinatario');
+                          }}
+                          id="destinatario"
+                          name="destinatario"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="00.000.000/0000-00"
+                        />
+                        <span className="text-sm text-gray-500">{destinatarioNome}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                      </svg>
+                      Dados da Carga
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                          </svg>
+                          Produto predominante
+                        </label>
+                        <input type="text" value={produtoPredominante} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          setProdutoPredominante(e.target.value);
+                        }} className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: Fio, Tecido, etc." />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                          </svg>
+                          Valor da carga
+                        </label>
+                        <input
+                          type="text"
+                          value={valorCarga}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                            setValorCarga(e.target.value);
+                            sendObj.VALORCARGA = parseFloat(value) || 0;
+                          }}
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                          </svg>
+                          Unidade carga
+                        </label>
+                        <select
+                          value={unidCarga}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                            setUnidCarga(e.target.value);
+                          }}
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                        >
+                          <option value="">Selecione uma unidade</option>
+                          <option value="KG">KG</option>
+                          <option value="TON">TON</option>
+                          <option value="UNIDADE">UNIDADE</option>
+                          <option value="M3">M3</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
+                          </svg>
+                          Quantidade carga
+                        </label>
+                        <input
+                          type="text"
+                          value={quantidadeCarga}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace(',', '.');
+                            setQuantidadeCarga(e.target.value);
+                            sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(value) || 0;
+                            sendObj.VALORCARGAAVERB = parseFloat(value) || 0;
+                          }}
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="0,00"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                          </svg>
+                          Valor serviço / Receber
+                        </label>
+                        <input
+                          type="text"
+                          value={valorServico}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                            setValorServico(e.target.value);
+                            sendObj.VALORSERVICO = parseFloat(value) || 0;
+                            sendObj.VALORRECEBER = parseFloat(value) || 0;
+                          }}
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              )}
+              {/* 373.249.934-00  AAW1H16 */}
+
+              {tab === "Comp/Tributos" && (
+                <div className="space-y-8">
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label htmlFor="placaVeiculoTração" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                          </svg>
+                          Veículo Tração ( PLACA )
+                        </label>
+                        <input
+                          type="text"
+                          value={placaVeiculoTração}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setPlacaVeiculoTração(e.target.value);
+                          }}
+                          id="placaVeiculoTração"
+                          name="placaVeiculoTração"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="ABC-1234"
+                        />
+                        <span className="text-sm text-gray-500">{veiculoNome}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="motorista" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
+                          </svg>
+                          Motorista ( CPF )
+                        </label>
+                        <input
+                          type="text"
+                          value={motorista}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            formatarCpfCnpj(e.target.value, 'motorista');
+                          }}
+                          id="motorista"
+                          name="motorista"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="000.000.000-00"
+                        />
+                        <span className="text-sm text-gray-500">{motoristaNome}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                      </svg>
+                      Dados da Carga
+                    </h2>
                     <div className="space-y-2">
                       <label htmlFor="Remetente" className="block text-sm font-semibold text-gray-700 flex items-center">
                         <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                         </svg>
-                        Remetente CPF/CNPJ
+                        Valor do ICMS
                       </label>
                       <input
                         type="text"
@@ -229,146 +672,85 @@ function App() {
                         placeholder="00.000.000/0000-00"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label htmlFor="destinatario" className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-                        </svg>
-                        Destinatário CPF/CNPJ
-                      </label>
-                      <input
-                        type="text"
-                        value={cpfCnpjDestinatario}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          formatarCpfCnpj(e.target.value, 'destinatario');
-                        }}
-                        id="destinatario"
-                        name="destinatario"
-                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                        placeholder="00.000.000/0000-00"
-                      />
+                  </div>
+
+
+                </div>
+              )}
+
+              {tab === "documentos" && (
+                <div className="space-y-8">
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                      Documentos Fiscais
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label htmlFor="numeroNotaFiscal" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                          </svg>
+                          Número da Nota Fiscal
+                        </label>
+                        <input
+                          type="text"
+                          value={numeroNotaFiscal}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setNumeroNotaFiscal(e.target.value);
+                          }}
+                          id="numeroNotaFiscal"
+                          name="numeroNotaFiscal"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="000000000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="chaveNotaFiscal" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                          </svg>
+                          Chave da Nota Fiscal
+                        </label>
+                        <input
+                          type="text"
+                          value={chaveNotaFiscal}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            setChaveNotaFiscal(e.target.value);
+                          }}
+                          id="chaveNotaFiscal"
+                          name="chaveNotaFiscal"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="Chave de 44 dígitos"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
+              )}
 
-                <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                    Dados da Carga
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                        </svg>
-                        Produto predominante
-                      </label>
-                      <input type="text" onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        sendObj.DESCCARGA = e.target.value;
-                        sendObj.TIPOCARGA = e.target.value;
-                      }} className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: Fio, Tecido, etc." />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                        </svg>
-                        Valor da carga
-                      </label>
-                      <input
-                        type="text"
-                        value={valorCarga}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                          setValorCarga(e.target.value);
-                          sendObj.VALORCARGA = parseFloat(value) || 0;
-                        }}
-                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                        placeholder="R$ 0,00"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                        </svg>
-                        Unidade carga
-                      </label>
-                      <input onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        setUnidCarga(e.target.value);
-                      }} type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: KG, TON, etc." />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
-                        </svg>
-                        Quantidade carga
-                      </label>
-                      <input
-                        type="text"
-                        value={quantidadeCarga}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value.replace(',', '.');
-                          setQuantidadeCarga(e.target.value);
-                          sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(value) || 0;
-                          sendObj.VALORCARGAAVERB = parseFloat(value) || 0;
-                        }}
-                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                        placeholder="0,00"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                        Valor serviço
-                      </label>
-                      <input
-                        type="text"
-                        value={valorServico}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                          setValorServico(e.target.value);
-                          sendObj.VALORSERVICO = parseFloat(value) || 0;
-                        }}
-                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                        placeholder="R$ 0,00"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                        </svg>
-                        Valor a receber
-                      </label>
-                      <input
-                        type="text"
-                        value={valorReceber}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                          setValorReceber(e.target.value);
-                          sendObj.VALORRECEBER = parseFloat(value) || 0;
-                        }}
-                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                        placeholder="R$ 0,00"
-                      />
-                    </div>
+              {tab === 'Reforma Tributária' && (
+                <div className="space-y-8">
+                  <div>
+                    <label>v. CBS</label>
+                    <input type="text" />
+                  </div>
+                  <div>
+                    <label>p. CBS</label>
+                    <input type="text" />
+                  </div>
+                  <div>
+                    <label>v. IBS UF / v. IBS</label>
+                    <input type="text" />
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex justify-center pt-6">
+
+
+              <div className="flex justify-center p-6">
                 <button
                   type="button"
                   onClick={() => loadingData()}
@@ -378,7 +760,7 @@ function App() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                   Buscar
+                    Buscar
                   </span>
                 </button>
               </div>

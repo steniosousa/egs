@@ -26,20 +26,15 @@ export let sendObj = {
     "OBSERVACOES": null,
     "OBSERVACOESAUTO": null,
     "MODAL": "01",
-    //alterar aqui
-    "VALORCARGAAVERB": 0, // -> quantidade carga
+    "VALORCARGAAVERB": 0, 
     "IDDESTINATARIO": 0,
-
     "IDCONTRATANTE": 567080,
-
     "DATAEMISSAO": new Date().toISOString(),
     "VALORRECEBER": 5,
     "VALORSERVICO": 7,
     "VALORCARGA": 123,
     "DESCCARGA": "FIO",
     "TIPOCARGA": "FIO",
-
-    //ate aqui
     "CODCIDADEEMISSAOCTE": 2307650,
     "CODCIDADEINISERV": 2307650,
     "CODCIDADEFIMSERV": 2408102,
@@ -66,7 +61,6 @@ export let sendObj = {
     "VBCCOFINS": 0,
     "VBCPIS": 0,
     "VALORCSLL": 0,
-
     "IDSEGURO": null,
     "VALORTRIBFEDERAL": null,
     "NUMERACAOMANUAL": false,
@@ -135,15 +129,15 @@ export let sendObj = {
     "DOCNF": [],
     "DOCNFE": [
         {
-            "IDENT": 10761759,
-            "IDCTE": 4630010,
-            "CHAVENFE": "23260407332190001246550010007808441710302873",
+            "IDENT": 0,
+            "IDCTE": 0,
+            "CHAVENFE": "",
             "VALORNFE": null,
             "PESOB": null,
             "PESOL": null,
             "PIN": null,
             "DATAPREVENTREGA": null,
-            "PITEM": 0.2,
+            "PITEM": 0,
             "NNF": "000780844",
             "NCM": null,
             "DESCPRODUTO": null
@@ -161,9 +155,9 @@ export let sendObj = {
     "CompFrete": [],
     "CARGAQTD": [
         {
-            "IDENT": 6735850,
-            "SEQUENCIAL": 1,
-            "IDCTE": 4630010,
+            "IDENT": 0,
+            "SEQUENCIAL": 0,
+            "IDCTE": 0,
             "UNIDADE": "",
             "QUANTIDADE": 0,
             "TIPOMEDIDA": null,
@@ -174,9 +168,9 @@ export let sendObj = {
     ],
 
     "MODALRODO": {
-        "IDENT": 5474883,
-        "IDCTE": 4630010,
-        "RNTC": "53841655",
+        "IDENT": 0,
+        "IDCTE": 0,
+        "RNTC": "0",
         "DATAPREVENTREGA": "0001-01-01T00:00:00",
         "INDLOTACAO": 0,
         "CIOT": null,
@@ -247,70 +241,6 @@ export let sendObj = {
             "IDVEICULO": null
         }
     ],
-
-    //
-    // https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GVEICULO?search=AKT2F24&tipoVeiculo=T
-    // query => search: AKT2F24, tipoVeiculo: T
-    // res:[
-    //     {
-    //         "IDENT": 143838,
-    //         "PLACA": "AKT2F24",
-    //         "UF": "SP",
-    //         "TARA": 23.0,
-    //         "DESCRICAO": "SCANIA/R124 GA4X2NZ 400",
-    //         "MOTORISTA": null,
-    //         "DATAPESAGEM": null,
-    //         "STATUS": "N",
-    //         "IDCADASTRO": 1153112,
-    //         "VALORVEICULO": null,
-    //         "PRAZODEPRECIACAO": null,
-    //         "PROPRIO": false,
-    //         "IDGRUPOVEICULO": 3,
-    //         "IDVEICULO": 130786,
-    //         "IDEMPRESA": 41291,
-    //         "RENAVAN": "00799611131",
-    //         "TIPOVEICULO": "T",
-    //         "TIPORODADO": "03",
-    //         "TIPOCARROCERIA": "00",
-    //         "CAPACIDADEKG": null,
-    //         "CAPACIDADEM": null,
-    //         "TIPOPROPRIETARIO": 1,
-    //         "DATACREATE": "2024-06-05T06:43:15.647",
-    //         "USERCREATE": "FINANCEIRO",
-    //         "DATAALTER": null,
-    //         "USERALTER": null,
-    //         "RNTC": "55915599",
-    //         "IDPLANOMANUTVEIC": null,
-    //         "ANO": null,
-    //         "MODELO": null,
-    //         "DATAAQUISICAO": null,
-    //         "KMAQUISICAO": null,
-    //         "IDMOTORISTA": null,
-    //         "IDPROPVEICULO": 1153112,
-    //         "KMATUAL": null,
-    //         "DATAKMATUAL": null,
-    //         "IDPRODUTO": null,
-    //         "IDCCUSTO": null,
-    //         "IDDEPARTAMENTO": null,
-    //         "IDCRESULTADO": null,
-    //         "UFINSCESTADUAL": "SP",
-    //         "CODCADASTRO": 372,
-    //         "INSCESTADUAL": null,
-    //         "CODGRUPO": "03",
-    //         "NOMEPROPRIETARIO": "VITORIA TRANSPORTE",
-    //         "DESCGRUPOVEICULO": "Cavalo Mecânico",
-    //         "VALORPEDAGIO": null,
-    //         "CPFCNPJ": "09581459000109",
-    //         "DESCTIPORODADO": "Cavalo Mecânico",
-    //         "DESCTIPOCARROCERIA": "não aplicável",
-    //         "DESCTIPOVEICULO": "Tração",
-    //         "DESCTIPOPROPRIETARIO": "TAC - Independente",
-    //         "DESCVEICULOTRACAO": null,
-    //         "DESCPLANOMANUT": null,
-    //         "CATCOMBVEICULAR": null,
-    //         "IDENTFILTRO": 1
-    //     }
-    // ]
     "Especies": [],
     "IcmsPart": [],
     "OrigDest": null,
