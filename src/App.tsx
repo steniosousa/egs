@@ -11,6 +11,10 @@ function App() {
   const [loading, setLoading] = useState<boolean>(() => !token);
   const [cpfCnpjDestinatario, setCpfCnpjDestinatario] = useState<string>('');
   const [cpfCnpjRemetente, setCpfCnpjRemetente] = useState<string>('');
+  const [quantidadeCarga, setQuantidadeCarga] = useState<string>('0');
+  const [valorCarga, setValorCarga] = useState<string>('0');
+  const [valorServico, setValorServico] = useState<string>('0');
+  const [valorReceber, setValorReceber] = useState<string>('0');
 
   //   async function buscarCnpj(cnpj) {
   //     try {
@@ -97,7 +101,7 @@ function App() {
   }
   // 07.332.190/0007-89
   const loadingData = async () => {
-    const [destinatario, Remetente] = await Promise.all([
+    const [destinatario, Remetente, CargaQTD] = await Promise.all([
       axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
         "search": cpfCnpjDestinatario,
         "id": null,
@@ -117,10 +121,24 @@ function App() {
           headers: {
             'Authorization': 'Bearer ' + token,
           }
+        }),
+      axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/CarregamentoSimples", {
+        "name": "CTeUnidCarga",
+        "search": "01",
+        "id": null,
+        "propertyList": []
+      },
+        {
+          headers: {
+            'Authorization': 'Bearer ' + token,
+          }
         })
     ]);
     sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
     sendObj.IDCONTRATANTE = Remetente.data[0].IDCADASTRO;
+    sendObj.CARGAQTD[0].DESCMEDIDA = CargaQTD.data[0].DESCRICAO;
+    sendObj.CARGAQTD[0].DESCUNIDADE = CargaQTD.data[0].DESCRICAO.split(' - ')[1];
+    sendObj.CARGAQTD[0].QUANTIDADE = 1;
     console.log(sendObj);
   }
   const getToken = async () => {
@@ -247,7 +265,10 @@ function App() {
                         </svg>
                         Produto predominante
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: Fio, Tecido, etc." />
+                      <input type="text" onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        sendObj.DESCCARGA = e.target.value;
+                        sendObj.TIPOCARGA = e.target.value;
+                      }} className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: Fio, Tecido, etc." />
                     </div>
 
                     <div className="space-y-2">
@@ -257,7 +278,17 @@ function App() {
                         </svg>
                         Valor da carga
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="R$ 0,00" />
+                      <input
+                        type="text"
+                        value={valorCarga}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                          setValorCarga(e.target.value);
+                          sendObj.VALORCARGA = parseFloat(value) || 0;
+                        }}
+                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                        placeholder="R$ 0,00"
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -277,7 +308,18 @@ function App() {
                         </svg>
                         Quantidade carga
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="0,00" />
+                      <input
+                        type="text"
+                        value={quantidadeCarga}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const value = e.target.value.replace(',', '.');
+                          setQuantidadeCarga(e.target.value);
+                          sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(value) || 0;
+                          sendObj.VALORCARGAAVERB = parseFloat(value) || 0;
+                        }}
+                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                        placeholder="0,00"
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -287,7 +329,17 @@ function App() {
                         </svg>
                         Valor serviço
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="R$ 0,00" />
+                      <input
+                        type="text"
+                        value={valorServico}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                          setValorServico(e.target.value);
+                          sendObj.VALORSERVICO = parseFloat(value) || 0;
+                        }}
+                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                        placeholder="R$ 0,00"
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -297,7 +349,17 @@ function App() {
                         </svg>
                         Valor a receber
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="R$ 0,00" />
+                      <input
+                        type="text"
+                        value={valorReceber}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                          const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                          setValorReceber(e.target.value);
+                          sendObj.VALORRECEBER = parseFloat(value) || 0;
+                        }}
+                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                        placeholder="R$ 0,00"
+                      />
                     </div>
                   </div>
                 </div>
@@ -313,7 +375,7 @@ function App() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Gerar CTe
+                   Buscar
                   </span>
                 </button>
               </div>

@@ -29,43 +29,9 @@ export let sendObj = {
     //alterar aqui
     "VALORCARGAAVERB": 0, // -> quantidade carga
     "IDDESTINATARIO": 0,
-    
+
     "IDCONTRATANTE": 567080,
-    // https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO {
-    //     "search": "07.332.190/0007-89",
-    //     "id": null,
-    //     "propertyList": []
-    // },
-    //res:
-    //     [
-    //     {
-    //         "CODIGO": 4,
-    //         "NOME": "VICUNHA TEXTIL UND I",
-    //         "CPFCNPJ": "07.332.190/0012-46",
-    //         "INSCESTADUAL": "068206283",
-    //         "NOMEMUNICIPIO": "MARACANAU",
-    //         "CODESTADO": "CE",
-    //         "RAZAOSOCIAL": "VICUNHA TEXTIL S/A.",
-    //         "IDCADASTRO": 567083,
-    //         "CODCIDADE": 2307650,
-    //         "IDVENDEDOR": null,
-    //         "IDTRANSPORTADOR": null,
-    //         "FONE": null,
-    //         "EMAIL": null,
-    //         "CONTATO": null,
-    //         "CELULAR": null,
-    //         "MODFRETE": null,
-    //         "CODFORMAPGTO": null,
-    //         "IDCONDPGTO": null,
-    //         "CODCFOP": null,
-    //         "IDTABFRETE": null,
-    //         "CONTRIBUINTEICMS": 1,
-    //         "CONSUMIDORFINAL": false,
-    //         "FISJUR": false,
-    //         "CEP": "61901410",
-    //         "IDENTFILTRO": 1
-    //     }
-    // ]
+
     "DATAEMISSAO": new Date().toISOString(),
     "VALORRECEBER": 5,
     "VALORSERVICO": 7,
@@ -207,15 +173,6 @@ export let sendObj = {
         }
     ],
 
-    //
-    // https://api.egssistemas.com.br/EGSCTE//api/ComboBox/CarregamentoSimples
-    //      {
-    //    "name": "CTeUnidCarga",
-    //  "search": "01",
-    //"id": null,
-    //"propertyList": []
-    //}
-    //res: [{"CODIGO":"02","DESCRICAO":"02 - TON"}]
     "MODALRODO": {
         "IDENT": 5474883,
         "IDCTE": 4630010,
