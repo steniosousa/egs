@@ -26,6 +26,9 @@ function App() {
   const [destinatarioNome, setDestinatarioNome] = useState('')
   const [numeroNotaFiscal, setNumeroNotaFiscal] = useState<string>('')
   const [chaveNotaFiscal, setChaveNotaFiscal] = useState<string>('')
+  const [valorCBS, setValorCBS] = useState<string>('')
+  const [percentualCBS, setPercentualCBS] = useState<string>('')
+  const [valorIBS, setValorIBS] = useState<string>('')
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -283,6 +286,33 @@ function App() {
     setMotoristaNome(VeiculoMotorista.data[0].NOME)
     console.log(sendObj);
   }
+  const sendData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Token não encontrado. Faça login primeiro.');
+        return;
+      }
+
+      console.log('Enviando dados:', sendObj);
+      
+      // Aqui você fará a requisição POST para enviar os dados do CT-e
+      const response = await axios.post("https://api.egssistemas.com.br/EGSCTE/api/CTE", sendObj, {
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Resposta do servidor:', response.data);
+      alert('CT-e enviado com sucesso!');
+      
+    } catch (error) {
+      console.error('Erro ao enviar CT-e:', error);
+      alert('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
+    }
+  };
+
   const getToken = async () => {
     try {
       const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get("https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=50201&EGSERP=true");
@@ -431,6 +461,19 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zM9 5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     Documentos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("Reforma Tributária")}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "Reforma Tributária"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      }`}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                    </svg>
+                    Reforma Tributária
                   </button>
                 </nav>
               </div>
@@ -733,17 +776,79 @@ function App() {
 
               {tab === 'Reforma Tributária' && (
                 <div className="space-y-8">
-                  <div>
-                    <label>v. CBS</label>
-                    <input type="text" />
-                  </div>
-                  <div>
-                    <label>p. CBS</label>
-                    <input type="text" />
-                  </div>
-                  <div>
-                    <label>v. IBS UF / v. IBS</label>
-                    <input type="text" />
+                  <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                      </svg>
+                      Contribuições da Reforma Tributária
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label htmlFor="valorCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                          </svg>
+                          v. CBS (Valor)
+                        </label>
+                        <input
+                          type="text"
+                          value={valorCBS}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                            setValorCBS(e.target.value);
+                            sendObj.IBSCBS.vCBS = parseFloat(value) || 0;
+                          }}
+                          id="valorCBS"
+                          name="valorCBS"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                          </svg>
+                          p. CBS (Percentual)
+                        </label>
+                        <input
+                          type="text"
+                          value={percentualCBS}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace('%', '').replace(',', '.').trim();
+                            setPercentualCBS(e.target.value);
+                            sendObj.IBSCBS.pCBS = parseFloat(value) || 0;
+                          }}
+                          id="percentualCBS"
+                          name="percentualCBS"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="0,00%"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="valorIBS" className="block text-sm font-semibold text-gray-700 flex items-center">
+                          <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                          </svg>
+                          v. IBS UF / v. IBS
+                        </label>
+                        <input
+                          type="text"
+                          value={valorIBS}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                            setValorIBS(e.target.value);
+                            sendObj.IBSCBS.vIBSUF = parseFloat(value) || 0;
+                            sendObj.IBSCBS.vIBS = parseFloat(value) || 0;
+                          }}
+                          id="valorIBS"
+                          name="valorIBS"
+                          className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                          placeholder="R$ 0,00"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -761,6 +866,18 @@ function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     Buscar
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alert("depois envio, to cansado")}
+                  className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
+                >
+                  <span className="flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                    Enviar CT-e
                   </span>
                 </button>
               </div>
