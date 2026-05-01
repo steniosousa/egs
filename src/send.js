@@ -164,11 +164,11 @@ export let sendObj = {
             "IDENT": 6735850,
             "SEQUENCIAL": 1,
             "IDCTE": 4630010,
-            "UNIDADE": "01",
+            "UNIDADE": "",
             "QUANTIDADE": 0,
             "TIPOMEDIDA": null,
-            "DESCMEDIDA": "01 - KG",
-            "DESCUNIDADE": "KG",
+            "DESCMEDIDA": "",
+            "DESCUNIDADE": "",
             "EDITADO": false
         }
     ],

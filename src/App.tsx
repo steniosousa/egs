@@ -15,6 +15,7 @@ function App() {
   const [valorCarga, setValorCarga] = useState<string>('0');
   const [valorServico, setValorServico] = useState<string>('0');
   const [valorReceber, setValorReceber] = useState<string>('0');
+  const [unidCarga, setUnidCarga] = useState<string>('');
 
   //   async function buscarCnpj(cnpj) {
   //     try {
@@ -124,7 +125,7 @@ function App() {
         }),
       axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/CarregamentoSimples", {
         "name": "CTeUnidCarga",
-        "search": "01",
+        "search": unidCarga,
         "id": null,
         "propertyList": []
       },
@@ -298,7 +299,9 @@ function App() {
                         </svg>
                         Unidade carga
                       </label>
-                      <input type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: KG, TON, etc." />
+                      <input onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setUnidCarga(e.target.value);
+                      }} type="text" className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: KG, TON, etc." />
                     </div>
 
                     <div className="space-y-2">
