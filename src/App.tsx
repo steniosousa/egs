@@ -26,7 +26,6 @@ function App() {
   const [destinatarioNome, setDestinatarioNome] = useState('')
   const [numeroNotaFiscal, setNumeroNotaFiscal] = useState<string>('')
   const [chaveNotaFiscal, setChaveNotaFiscal] = useState<string>('')
-  const [valorCBS, setValorCBS] = useState<string>('')
   const [percentualCBS, setPercentualCBS] = useState<string>('')
   const [valorIBS, setValorIBS] = useState<string>('')
   const [saida, setSaida] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
@@ -329,10 +328,9 @@ function App() {
         params.append('username', 'FINANCEIRO');
         params.append('password', 'inter2026');
 
-        const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token", params, {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic NTAyMDE6ZWckeXN0ZW0='
+        const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token",params,{
+          headers:{
+            authorization: 'Basic NTAyMDE6ZWckeXN0ZW0='
           }
         });
 
@@ -368,8 +366,9 @@ function App() {
     const custoDestino = custoPorEstado.find((item) => item.CITY === destino.city && item.UF === destino.uf);
     const valorDoServico = ((custoDestino?.VALUE || 0) * cargaEmKg)
     setValorServico(valorDoServico.toLocaleString())
-    setValorICMS((valorDoServico * 0.12).toFixed(2))
-    console.log((valorDoServico * 0.12).toFixed(2))
+    setValorICMS((valorDoServico * 0.12).toLocaleString())
+    setPercentualCBS((valorDoServico * 0.9).toLocaleString())
+    setValorIBS((valorDoServico * 0.01).toLocaleString())
 
 
 
@@ -402,7 +401,7 @@ function App() {
 
   useEffect(() => {
     // getCTES()
-    // getToken()
+    //getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
   }, []);
 
@@ -841,27 +840,7 @@ function App() {
                               placeholder="R$ 0,00"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <label htmlFor="valorCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
-                              <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                              </svg>
-                              v. CBS (Valor)
-                            </label>
-                            <input
-                              type="text"
-                              value={valorCBS}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                setValorCBS(e.target.value);
-                                sendObj.IBSCBS.vCBS = parseFloat(value) || 0;
-                              }}
-                              id="valorCBS"
-                              name="valorCBS"
-                              className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                              placeholder="R$ 0,00"
-                            />
-                          </div>
+                     
                           <div className="space-y-2">
                             <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
