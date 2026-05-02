@@ -328,8 +328,8 @@ function App() {
         params.append('username', 'FINANCEIRO');
         params.append('password', 'inter2026');
 
-        const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token",params,{
-          headers:{
+        const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token", params, {
+          headers: {
             authorization: 'Basic NTAyMDE6ZWckeXN0ZW0='
           }
         });
@@ -369,10 +369,6 @@ function App() {
     setValorICMS((valorDoServico * 0.12).toLocaleString())
     setPercentualCBS((valorDoServico * 0.9).toLocaleString())
     setValorIBS((valorDoServico * 0.01).toLocaleString())
-
-
-
-
   }
 
 
@@ -737,7 +733,7 @@ function App() {
                             <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                             </svg>
-                            Valor do ICMS
+                            Valor do ICMS ( 12 %)
                           </label>
                           <input
                             type="text"
@@ -824,7 +820,7 @@ function App() {
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                               </svg>
-                              v. BC IBS/CBS 
+                              v. BC IBS/CBS  ( serviço )
                             </label>
                             <input
                               type="text"
@@ -840,13 +836,37 @@ function App() {
                               placeholder="R$ 0,00"
                             />
                           </div>
-                     
+
+                          <div className="space-y-2">
+                            <label htmlFor="valorBC" className="block text-sm font-semibold text-gray-700 flex items-center">
+                              <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                              </svg>
+                              p IBS UF
+                            </label>
+                            <input
+                              type="text"
+                              value={valorIBS}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                                setValorIBS(e.target.value);
+                                sendObj.IBSCBS.vBC = parseFloat(value) || 0;
+                              }}
+                              id="valorBC"
+                              name="valorBC"
+                              className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                              placeholder="R$ 0,00"
+                            />
+                          </div>
+
+
+
                           <div className="space-y-2">
                             <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                               </svg>
-                              p. CBS (Percentual)
+                              p. CBS ( 0.9% )
                             </label>
                             <input
                               type="text"
@@ -863,11 +883,32 @@ function App() {
                             />
                           </div>
                           <div className="space-y-2">
+                            <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
+                              <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                              </svg>
+                              v. CBS
+                            </label>
+                            <input
+                              type="text"
+                              value={percentualCBS}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                const value = e.target.value.replace('%', '').replace(',', '.').trim();
+                                setPercentualCBS(e.target.value);
+                                sendObj.IBSCBS.vCBS = parseFloat(value) || 0;
+                              }}
+                              id="percentualCBS"
+                              name="percentualCBS"
+                              className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                              placeholder="0,00%"
+                            />
+                          </div>
+                          <div className="space-y-2">
                             <label htmlFor="valorIBS" className="block text-sm font-semibold text-gray-700 flex items-center">
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                               </svg>
-                              v. IBS UF / v. IBS
+                              v. IBS UF / v. IBS ( 0.1% )
                             </label>
                             <input
                               type="text"
