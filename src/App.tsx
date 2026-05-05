@@ -364,11 +364,13 @@ function App() {
   const calcularFrete = (saida: { city: string, uf: string }, destino: { city: string, uf: string }) => {
     const cargaEmKg = quantidadeCarga / 1000
     const custoDestino = custoPorEstado.find((item) => item.CITY === destino.city && item.UF === destino.uf);
-    const valorDoServico = ((custoDestino?.VALUE || 0) * cargaEmKg)
-    setValorServico(valorDoServico.toLocaleString())
-    setValorICMS((valorDoServico * 0.12).toLocaleString())
-    setPercentualCBS((valorDoServico * 0.9).toLocaleString())
-    setValorIBS((valorDoServico * 0.01).toLocaleString())
+    const valorDoServiço = (238 * cargaEmKg)
+    const valorDoServicoComLocalString = valorDoServiço.toLocaleString('pt-br')
+    console.log("valor do servico", valorDoServicoComLocalString)
+    setValorServico(valorDoServicoComLocalString)
+    setValorICMS((valorDoServiço * 0.12).toFixed(2))
+    setPercentualCBS((valorDoServiço * 0.009).toFixed(2))
+    setValorIBS((valorDoServiço * 0.001).toFixed(2))
   }
 
 
@@ -397,7 +399,7 @@ function App() {
 
   useEffect(() => {
     // getCTES()
-    //getToken()
+    // getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
   }, []);
 
@@ -842,7 +844,7 @@ function App() {
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                               </svg>
-                              p IBS UF
+                              v IBS
                             </label>
                             <input
                               type="text"
@@ -861,27 +863,6 @@ function App() {
 
 
 
-                          <div className="space-y-2">
-                            <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
-                              <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                              </svg>
-                              p. CBS ( 0.9% )
-                            </label>
-                            <input
-                              type="text"
-                              value={percentualCBS}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const value = e.target.value.replace('%', '').replace(',', '.').trim();
-                                setPercentualCBS(e.target.value);
-                                sendObj.IBSCBS.pCBS = parseFloat(value) || 0;
-                              }}
-                              id="percentualCBS"
-                              name="percentualCBS"
-                              className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                              placeholder="0,00%"
-                            />
-                          </div>
                           <div className="space-y-2">
                             <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
