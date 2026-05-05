@@ -97,9 +97,8 @@ function App() {
 
         setQuantidadeCarga(parseFloat(qVol));
 
-        console.log(parseFloat(qVol))
-        sendObj.VALORCARGAAVERB = parseFloat(qVol);
         sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(qVol);
+        sendObj.PESOKG = parseFloat(qVol);
       }
 
       const chNFe = xmlDoc.querySelector("chNFe")?.textContent || xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
@@ -250,7 +249,6 @@ function App() {
       sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
       sendObj.IDCONTRATANTE = Remetente.data[0].IDCADASTRO;
       sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
-      sendObj.CARGAQTD[0].QUANTIDADE = 1;
       sendObj.DESCCARGA = produtoPredominante;
       sendObj.TIPOCARGA = produtoPredominante;
       sendObj.Veiculos[0] = {
@@ -299,7 +297,7 @@ function App() {
       console.log('Enviando dados:', sendObj);
 
       // Aqui você fará a requisição POST para enviar os dados do CT-e
-      const response = await axios.post("https://api.egssistemas.com.br/EGSCTE/api/CTE", sendObj, {
+      const response = await axios.post("https://api.egssistemas.com.br/EGSCTE//api/CteApi/Salvar", sendObj, {
         headers: {
           'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
@@ -371,6 +369,13 @@ function App() {
     setValorICMS((valorDoServiço * 0.12).toFixed(2))
     setPercentualCBS((valorDoServiço * 0.009).toFixed(2))
     setValorIBS((valorDoServiço * 0.001).toFixed(2))
+    sendObj.VALORSERVICO = valorDoServiço;
+    sendObj.VALORRECEBER = valorDoServiço;
+    sendObj.ICMS_VALORICMS = parseFloat((valorDoServiço * 0.12).toFixed(2));
+    sendObj.ICMS_VALORBC = valorDoServiço;
+    sendObj.IBSCBS.vBC = valorDoServiço;
+    sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
+    sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
   }
 
 
@@ -383,7 +388,6 @@ function App() {
           }
         }
       )
-      console.log(data)
       // setSendObj(data)
     } catch (e) {
       console.log(e)
@@ -394,11 +398,11 @@ function App() {
     if (!escolhaCte || escolhaCte === 0) {
       return
     }
-    // buscarCteEscolhida()
+    buscarCteEscolhida()
   }, [escolhaCte])
 
   useEffect(() => {
-    // getCTES()
+    getCTES()
     // getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
   }, []);
@@ -420,7 +424,7 @@ function App() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-            {!escolhaCte ? (
+            {escolhaCte ? (
               <div>
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                   <h1 className="text-2xl font-bold text-white">CT-e EGS</h1>
@@ -643,7 +647,7 @@ function App() {
                                 const value = e.target.value.replace('.', '').replace(',', '.');
                                 setQuantidadeCarga(parseFloat(value));
                                 sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(value) || 0;
-                                sendObj.VALORCARGAAVERB = parseFloat(value) || 0;
+                                sendObj.PESOKG = parseFloat(value) || 0;
                               }}
                               className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                               placeholder="0,00"
@@ -928,7 +932,7 @@ function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => alert("depois envio, to cansado")}
+                      onClick={() => sendData()}
                       className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
                     >
                       <span className="flex items-center">
