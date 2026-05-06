@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { custoPorEstado } from "./frete";
+import { carregarTabela, buscarValor19Ton } from "./tabelaMatrix";
 import { sendObj } from "./send";
 
 
@@ -139,7 +139,6 @@ function App() {
       }
 
 
-      console.log("Dados extraídos do XML com sucesso!");
     } catch (error) {
       console.error("Erro ao processar XML:", error);
       alert("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
@@ -257,7 +256,7 @@ function App() {
       sendObj.UFINISERV = destinatario.data[0].CODESTADO;
       sendObj.IDREMETENTE = Remetente.data[0].IDCADASTRO
       sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
-      sendObj.IDCONTRATANTE =destinatario.data[0].IDCADASTRO;
+      sendObj.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
       sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
       sendObj.DESCCARGA = produtoPredominante;
       sendObj.TIPOCARGA = produtoPredominante;
@@ -289,8 +288,6 @@ function App() {
       setDestinatarioNome(destinatario.data[0].NOME)
       setRemetenteNome(Remetente.data[0].NOME)
       setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
-      console.group(VeiculoTração.data[0])
-      console.log(sendObj);
     }
     catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -370,10 +367,19 @@ function App() {
 
   const calcularFrete = (saida: { city: string, uf: string }, destino: { city: string, uf: string }) => {
     const cargaEmKg = quantidadeCarga / 1000
-    const custoDestino = custoPorEstado.find((item) => item.CITY === destino.city && item.UF === destino.uf);
-    const valorDoServiço = (238 * cargaEmKg)
+
+    // Buscar valor da tabela Excel (coluna E - Bitruck 19 TON) usando cidade e UF do destino
+    const valorTabela = buscarValor19Ton(destino.city, destino.uf);
+    if (valorTabela === 0) {
+      toast.error("Valor do frete não encontrado")
+      return
+    }
+
+    // Se encontrou valor na tabela, usa ele. Senão, usa o cálculo padrão
+    const valorDoServiço = valorTabela ? (valorTabela * cargaEmKg) : 0;
+
     const valorDoServicoComLocalString = valorDoServiço.toLocaleString('pt-br')
-    console.log("valor do servico", valorDoServicoComLocalString)
+
     setValorServico(valorDoServicoComLocalString)
     setValorICMS((valorDoServiço * 0.12).toFixed(2))
     setPercentualCBS((valorDoServiço * 0.009).toFixed(2))
@@ -386,6 +392,7 @@ function App() {
     sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
     sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
   }
+
 
 
   const buscarCteEscolhida = async () => {
@@ -407,10 +414,11 @@ function App() {
     if (!escolhaCte || escolhaCte === 0) {
       return
     }
-    buscarCteEscolhida()
+    // buscarCteEscolhida()
   }, [escolhaCte])
 
   useEffect(() => {
+    carregarTabela()
     //getCTES()
     // getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
@@ -418,22 +426,22 @@ function App() {
 
   useEffect(() => { calcularFrete(saida, destino) }, [quantidadeCarga])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg">
-          <p className="mt-4 text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+  //       <div className="bg-white p-8 rounded-lg shadow-lg">
+  //         <p className="mt-4 text-gray-600">Carregando...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-            {escolhaCte ? (
+            {!escolhaCte ? (
               <div>
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                   <h1 className="text-2xl font-bold text-white">CT-e EGS</h1>
