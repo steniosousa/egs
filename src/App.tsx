@@ -134,6 +134,8 @@ function App() {
           city: destinoCidade,
           uf: destinoUF
         })
+
+
       }
 
 
@@ -246,8 +248,16 @@ function App() {
             }
           })
       ]);
+      sendObj.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
+      sendObj.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
+      sendObj.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
+      sendObj.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
+      sendObj.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
+      sendObj.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
+      sendObj.UFINISERV = destinatario.data[0].CODESTADO;
+      sendObj.IDREMETENTE = Remetente.data[0].IDCADASTRO
       sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
-      sendObj.IDCONTRATANTE = Remetente.data[0].IDCADASTRO;
+      sendObj.IDCONTRATANTE =destinatario.data[0].IDCADASTRO;
       sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
       sendObj.DESCCARGA = produtoPredominante;
       sendObj.TIPOCARGA = produtoPredominante;
@@ -342,7 +352,6 @@ function App() {
 
   }
 
-
   const getCTES = async () => {
     try {
       const { data } = await axios.get('https://api.egssistemas.com.br/EGSCTE//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true',
@@ -402,7 +411,7 @@ function App() {
   }, [escolhaCte])
 
   useEffect(() => {
-    getCTES()
+    //getCTES()
     // getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
   }, []);
