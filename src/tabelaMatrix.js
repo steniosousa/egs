@@ -31,7 +31,6 @@ export const carregarTabela = async () => {
   }
 };
 
-// Funções auxiliares para cada tipo de caminhão
 export const buscarValor14Ton = (cidade, uf) => {
   return buscarValorPorColuna(cidade, uf, 'Truck 14 TON');
 };

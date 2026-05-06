@@ -2,6 +2,8 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { carregarTabela, buscarValor19Ton } from "./tabelaMatrix";
 import { sendObj } from "./send";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 
 
@@ -367,17 +369,13 @@ function App() {
 
   const calcularFrete = (saida: { city: string, uf: string }, destino: { city: string, uf: string }) => {
     const cargaEmKg = quantidadeCarga / 1000
-
-    // Buscar valor da tabela Excel (coluna E - Bitruck 19 TON) usando cidade e UF do destino
     const valorTabela = buscarValor19Ton(destino.city, destino.uf);
     if (valorTabela === 0) {
       toast.error("Valor do frete não encontrado")
       return
     }
 
-    // Se encontrou valor na tabela, usa ele. Senão, usa o cálculo padrão
-    const valorDoServiço = valorTabela ? (valorTabela * cargaEmKg) : 0;
-
+    const valorDoServiço = valorTabela * cargaEmKg
     const valorDoServicoComLocalString = valorDoServiço.toLocaleString('pt-br')
 
     setValorServico(valorDoServicoComLocalString)
@@ -999,6 +997,7 @@ function App() {
           </div>
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 }
