@@ -5,10 +5,6 @@ import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-
-
-
-
 function App() {
   const token = localStorage.getItem('token');
   const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
@@ -30,6 +26,8 @@ function App() {
   const [chaveNotaFiscal, setChaveNotaFiscal] = useState<string>('')
   const [percentualCBS, setPercentualCBS] = useState<string>('')
   const [valorIBS, setValorIBS] = useState<string>('')
+  const [tipoCaminhao, setTipoCaminhao] = useState<string>('14')
+  const [loadingTabela, setLoadingTabela] = useState<boolean>(true)
   const [saida, setSaida] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [destino, setDestino] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [valorICMS, setValorICMS] = useState('0')
@@ -89,16 +87,12 @@ function App() {
       if (totalValor > 0) {
         const valorFormatado = totalValor.toLocaleString('pt-BR');
         setValorCarga(valorFormatado);
-        sendObj.VALORCARGA = totalValor;
+        sendObj.VALORCARGA = parseFloat(valorFormatado);
       }
 
       if (vol) {
         const qVol = vol.querySelector("pesoB")?.textContent || "0";
-        const esp = vol.querySelector("esp")?.textContent || "";
-
-
         setQuantidadeCarga(parseFloat(qVol));
-
         sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(qVol);
         sendObj.PESOKG = parseFloat(qVol);
       }
@@ -142,8 +136,7 @@ function App() {
 
 
     } catch (error) {
-      console.error("Erro ao processar XML:", error);
-      alert("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
+      toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
     }
   };
 
@@ -158,7 +151,7 @@ function App() {
       };
       reader.readAsText(file);
     } else {
-      alert("Por favor, selecione um arquivo XML válido.");
+      toast.error("Por favor, selecione um arquivo XML válido.");
     }
   };
 
@@ -172,7 +165,6 @@ function App() {
     let formattedValue = '';
 
     if (value.length <= 11) {
-      // Formato CPF: XXX.XXX.XXX-XX
       if (value.length <= 3) {
         formattedValue = value;
       } else if (value.length <= 6) {
@@ -183,7 +175,6 @@ function App() {
         formattedValue = value.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
       }
     } else {
-      // Formato CNPJ: XX.XXX.XXX/XXXX-XX
       if (value.length <= 2) {
         formattedValue = value;
       } else if (value.length <= 5) {
@@ -293,7 +284,7 @@ function App() {
       setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
     }
     catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      toast.error("Erro ao carregar dados")
     }
   }
 
@@ -327,7 +318,6 @@ function App() {
   const getToken = async () => {
     try {
       const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get("https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=50201&EGSERP=true");
-      console.log(data);
       setTimeout(async () => {
         const params = new URLSearchParams();
         params.append('auxtoken', data.AUXTOKEN);
@@ -455,23 +445,41 @@ function App() {
   }, [escolhaCte])
 
   useEffect(() => {
-    carregarTabela()
+    const loadTabela = async () => {
+      try {
+        setLoadingTabela(true);
+        const resultado = await carregarTabela();
+        setTimeout(() => {
+          setLoadingTabela(false);
+        }, 100);
+      } catch (error) {
+        toast.error('Erro ao carregar tabela de fretes');
+        setLoadingTabela(false);
+      }
+    };
+    
+    loadTabela();
     //getCTES()
     // getToken()
     // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
   }, []);
 
-  useEffect(() => { calcularFrete(saida, destino) }, [quantidadeCarga])
+  useEffect(() => {
+    if (!destino) return
+    calcularFrete(saida, destino)
+  }, [quantidadeCarga])
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-  //       <div className="bg-white p-8 rounded-lg shadow-lg">
-  //         <p className="mt-4 text-gray-600">Carregando...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (loading || loadingTabela) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg">
+          <p className="mt-4 text-gray-600">
+            {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -678,9 +686,7 @@ function App() {
                               type="text"
                               value={valorCarga}
                               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                const value = e.target.value.replace('R$', '').replace(',', '.').trim();
                                 setValorCarga(e.target.value);
-                                sendObj.VALORCARGA = parseFloat(value) || 0;
                               }}
                               className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                               placeholder="R$ 0,00"
