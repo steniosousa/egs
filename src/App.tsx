@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { carregarTabela, buscarValor19Ton } from "./tabelaMatrix";
+import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton, buscarValor32_35Ton, buscarValor38_40Ton, buscarValor50Ton } from "./tabelaMatrix";
 import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -205,6 +205,7 @@ function App() {
       setMotorista(formattedValue);
     }
   }
+
   const loadingData = async () => {
     try {
 
@@ -295,6 +296,7 @@ function App() {
       console.error('Erro ao carregar dados:', error);
     }
   }
+
   const sendData = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -369,8 +371,47 @@ function App() {
 
   const calcularFrete = (saida: { city: string, uf: string }, destino: { city: string, uf: string }) => {
     const cargaEmKg = quantidadeCarga / 1000
-    const valorTabela = buscarValor19Ton(destino.city, destino.uf);
-    if (valorTabela === 0) {
+
+    let valorTabela = 0;
+    let tipoCaminhao = '50';
+
+
+    if (quantidadeCarga >= 13980 && quantidadeCarga < 19000) {
+      tipoCaminhao = '14';
+    } else if (quantidadeCarga >= 19000 && quantidadeCarga < 27000) {
+      tipoCaminhao = '19';
+    } else if (quantidadeCarga >= 27000 && quantidadeCarga < 31980) {
+      tipoCaminhao = '27_30';
+    } else if (quantidadeCarga >= 31980 && quantidadeCarga < 38000) {
+      tipoCaminhao = '32_35';
+    } else if (quantidadeCarga >= 38000 && quantidadeCarga < 50000) {
+      tipoCaminhao = '38_40';
+    }
+
+    switch (tipoCaminhao) {
+      case '14':
+        valorTabela = buscarValor14Ton(destino.city, destino.uf);
+        break;
+      case '19':
+        valorTabela = buscarValor19Ton(destino.city, destino.uf);
+        break;
+      case '27_30':
+        valorTabela = buscarValor27_30Ton(destino.city, destino.uf);
+        break;
+      case '32_35':
+        valorTabela = buscarValor32_35Ton(destino.city, destino.uf);
+        break;
+      case '38_40':
+        valorTabela = buscarValor38_40Ton(destino.city, destino.uf);
+        break;
+      case '50':
+        valorTabela = buscarValor50Ton(destino.city, destino.uf);
+        break;
+      default:
+        valorTabela = buscarValor14Ton(destino.city, destino.uf);
+    }
+
+    if (!valorTabela || valorTabela === 0) {
       toast.error("Valor do frete não encontrado")
       return
     }
@@ -390,8 +431,6 @@ function App() {
     sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
     sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
   }
-
-
 
   const buscarCteEscolhida = async () => {
     try {
