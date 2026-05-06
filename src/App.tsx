@@ -317,30 +317,60 @@ function App() {
 
   const getToken = async () => {
     try {
+      // Verificar se já existe um token válido
+      const currentToken = localStorage.getItem('token');
+      const expiresId = localStorage.getItem('expires_id');
+      const tokenTimestamp = localStorage.getItem('token_timestamp');
+
+      if (currentToken && expiresId && tokenTimestamp) {
+        const currentTime = Date.now();
+        const tokenTime = parseInt(tokenTimestamp);
+        const expiresIn = parseInt(expiresId) * 1000; // Converter para milissegundos
+
+        // Verificar se o token ainda não expirou (com margem de 5 minutos)
+        if (currentTime - tokenTime < (expiresIn - 300000)) {
+          console.log('Token ainda válido, usando token existente');
+          setLoading(false);
+          getCTES()
+
+          return;
+        }
+      }
+
+
       const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get("https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=50201&EGSERP=true");
       setTimeout(async () => {
-        const params = new URLSearchParams();
-        params.append('auxtoken', data.AUXTOKEN);
-        params.append('captcha', '');
-        params.append('codigo2fa', '');
-        params.append('grant_type', 'password');
-        params.append('username', 'FINANCEIRO');
-        params.append('password', 'inter2026');
+        try {
 
-        const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token", params, {
-          headers: {
-            authorization: 'Basic NTAyMDE6ZWckeXN0ZW0='
-          }
-        });
+          const params = new URLSearchParams();
+          params.append('auxtoken', data.AUXTOKEN);
+          params.append('captcha', '');
+          params.append('codigo2fa', '');
+          params.append('grant_type', 'password');
+          params.append('username', 'FINANCEIRO');
+          params.append('password', 'inter2026');
 
-        localStorage.setItem('token', tokenData.data.access_token);
-        setLoading(false);
-        console.log(tokenData.data.access_token);
+          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token", params, {
+            headers: {
+              authorization: 'Basic NTAyMDE6ZWckeXN0ZW0='
+            }
+          });
+
+          localStorage.setItem('expires_id', tokenData.data.expires_in);
+          localStorage.setItem('token', tokenData.data.access_token);
+          localStorage.setItem('token_timestamp', Date.now().toString());
+          getCTES()
+
+          setLoading(false);
+        } catch (error: any) {
+          toast.error(error.response.data.error_description || "Erro ao obter token")
+          setLoading(false)
+        }
       }, 1000);
     } catch (error) {
-      console.error(error);
+      toast.error("Erro ao obter token")
+      setLoading(false);
     }
-
   }
 
   const getCTES = async () => {
@@ -441,7 +471,7 @@ function App() {
     if (!escolhaCte || escolhaCte === 0) {
       return
     }
-    // buscarCteEscolhida()
+    buscarCteEscolhida()
   }, [escolhaCte])
 
   useEffect(() => {
@@ -457,11 +487,9 @@ function App() {
         setLoadingTabela(false);
       }
     };
-    
+
     loadTabela();
-    //getCTES()
-    // getToken()
-    // localStorage.setItem('token', 'k_CigZKN6BKgdHCtNXBqsOninhGPAuQVij4sAhnioz3fnRKKtG8nE48HBwj5z4ZCldB47e30J4QwGtvkpxgNX6SMPlMwciMH5D4NU5EU3ZFAP594fDBZm1EBO4jhkopvwkUdEZSbHxhHxK3HIx6b-CRRi8g44sLBSPafoIi13b6MET7T4wCKt5tJLyR2Jj_z0WsttlBSMTlJ9__AQcP_9c1gAwp3scMG9f6i4atgELtoGYJdlQYNnsdsAPgpJ92bIZA9kpSblenrNtxgn3ntc1a5kwdenTxKRbqd30Wr2JnEVZhyGqJpu-6yO8QX_uXudX3r1DJyl0FXKtcbIyJuHhcURHOLnVPDPOuRctoyGL5P190GFQ8QUFJtntFfGUooAC-DolbMzMSDVG4xyPCIk5oJkVPlpic_Hy3NEhSvprBOSrHoETBjXSrhwnGDltnzc1wyuVwTbTMxKytB6y0RlZpIUi8gkn25Q8VWMeBD4gwCc0JsOfx8_Os2kyOcTJTEu25UZw_HvcVWbfUqZxQdK50FwwFirySAH4z3_nCko78');
+    getToken()
   }, []);
 
   useEffect(() => {
@@ -486,7 +514,7 @@ function App() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white shadow-xl rounded-lg overflow-hidden">
-            {!escolhaCte ? (
+            {escolhaCte ? (
               <div>
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                   <h1 className="text-2xl font-bold text-white">CT-e EGS</h1>
