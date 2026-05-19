@@ -23,7 +23,6 @@ export const carregarTabela = async () => {
     });
     
     tabelaData = data;
-    console.log('Tabela carregada com sucesso:', data.length, 'linhas');
     return data;
   } catch (error) {
     console.error('Erro ao carregar tabela:', error);
@@ -61,7 +60,6 @@ export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
     console.warn('Tabela não carregada. Execute carregarTabela() primeiro.');
     return null;
   }
-  console.log(`Buscando: ${cidade}/${uf} - Tipo: ${tipoCaminhao}`);
   
   // Buscar a linha que corresponde à cidade e UF
   const linhaEncontrada = tabelaData.find(row => {
@@ -74,11 +72,9 @@ export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
   if (linhaEncontrada) {
     // Retornar o valor da coluna especificada (tipo de caminhão)
     const valor = linhaEncontrada[tipoCaminhao] || 0;
-    console.log(`Valor encontrado para ${cidade}/${uf} (${tipoCaminhao}):`, valor);
     return valor;
   }
   
-  console.warn(`Não encontrado valor para ${cidade}/${uf} (${tipoCaminhao})`);
   return null;
 };
 

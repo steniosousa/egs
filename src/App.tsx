@@ -1,7 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton, buscarValor32_35Ton, buscarValor38_40Ton, buscarValor50Ton } from "./tabelaMatrix";
-import { sendObj } from "./send";
+// import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -26,16 +26,14 @@ function App() {
   const [chaveNotaFiscal, setChaveNotaFiscal] = useState<string>('')
   const [percentualCBS, setPercentualCBS] = useState<string>('')
   const [valorIBS, setValorIBS] = useState<string>('')
-  const [tipoCaminhao, setTipoCaminhao] = useState<string>('14')
   const [loadingTabela, setLoadingTabela] = useState<boolean>(true)
   const [saida, setSaida] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [destino, setDestino] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [valorICMS, setValorICMS] = useState('0')
   const [escolhaCte, setEscolhaCte] = useState<number>(0)
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
-  // const [sendObj, setSendObj] = useState<any>({})
-
-
+  const [sendObj, setSendObj] = useState<any>({})
+  const [dadosBuscados, setDadosBuscados] = useState(false)
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -79,15 +77,15 @@ function App() {
         setProdutoPredominante(produto);
       }
 
-      let totalValor = 0;
+      let totalValor = '0';
       if (icmsTot) {
         const vNF = icmsTot.querySelector("vNF")?.textContent || "0";
-        totalValor = parseFloat(vNF.replace(',', '.'));
+        totalValor = vNF
       }
-      if (totalValor > 0) {
-        const valorFormatado = totalValor.toLocaleString('pt-BR');
-        setValorCarga(valorFormatado);
-        sendObj.VALORCARGA = parseFloat(valorFormatado);
+      if (totalValor !== '0') {
+        const valueWithToFixed = parseInt(totalValor).toFixed(2)
+        setValorCarga(totalValor);
+        sendObj.VALORCARGA = Number(valueWithToFixed);
       }
 
       if (vol) {
@@ -200,6 +198,11 @@ function App() {
   const loadingData = async () => {
     try {
 
+      if (!cpfCnpjDestinatario || !cpfCnpjRemetente || !placaVeiculoTração || !motorista) {
+        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
+        return
+      }
+
       const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
         axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
           "search": cpfCnpjDestinatario,
@@ -278,10 +281,12 @@ function App() {
       sendObj.IDVEICULO = VeiculoTração.data[0].IDVEICULO
       sendObj.DOCNFE[0].CHAVENFE = chaveNotaFiscal
       sendObj.DOCNFE[0].NNF = numeroNotaFiscal
+      sendObj.IDMOTORISTA = Motorista.data[0].IDCADASTRO
       setMotoristaNome(Motorista.data[0].NOME)
       setDestinatarioNome(destinatario.data[0].NOME)
       setRemetenteNome(Remetente.data[0].NOME)
       setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
+      setDadosBuscados(true)
     }
     catch (error) {
       toast.error("Erro ao carregar dados")
@@ -292,32 +297,31 @@ function App() {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Token não encontrado. Faça login primeiro.');
+        toast.error('Token não encontrado. Faça login primeiro.');
         return;
       }
 
-      console.log('Enviando dados:', sendObj);
+      if (!dadosBuscados) {
+        toast.info("Antes de enviar clique no botão 'Buscar Informações'")
+        return
+      }
 
-      // Aqui você fará a requisição POST para enviar os dados do CT-e
-      const response = await axios.post("https://api.egssistemas.com.br/EGSCTE//api/CteApi/Salvar", sendObj, {
+      await axios.post("https://api.egssistemas.com.br/EGSCTE//api/CteApi/Salvar", sendObj, {
         headers: {
           'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
         }
       });
 
-      console.log('Resposta do servidor:', response.data);
-      alert('CT-e enviado com sucesso!');
+      toast.info('CT-e enviado com sucesso!');
 
     } catch (error) {
-      console.error('Erro ao enviar CT-e:', error);
-      alert('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
+      toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
     }
   };
 
   const getToken = async () => {
     try {
-      // Verificar se já existe um token válido
       const currentToken = localStorage.getItem('token');
       const expiresId = localStorage.getItem('expires_id');
       const tokenTimestamp = localStorage.getItem('token_timestamp');
@@ -325,11 +329,9 @@ function App() {
       if (currentToken && expiresId && tokenTimestamp) {
         const currentTime = Date.now();
         const tokenTime = parseInt(tokenTimestamp);
-        const expiresIn = parseInt(expiresId) * 1000; // Converter para milissegundos
+        const expiresIn = parseInt(expiresId) * 1000;
 
-        // Verificar se o token ainda não expirou (com margem de 5 minutos)
         if (currentTime - tokenTime < (expiresIn - 300000)) {
-          console.log('Token ainda válido, usando token existente');
           setLoading(false);
           getCTES()
 
@@ -383,9 +385,8 @@ function App() {
         }
       )
       setCtes(data.value)
-      console.log(data.value)
     } catch (e) {
-      console.log(e)
+      toast.error("Erro ao recuperar CTES")
     }
   }
 
@@ -447,8 +448,9 @@ function App() {
     sendObj.VALORRECEBER = valorDoServiço;
     sendObj.ICMS_VALORICMS = parseFloat((valorDoServiço * 0.12).toFixed(2));
     sendObj.ICMS_VALORBC = valorDoServiço;
-    sendObj.IBSCBS.vBC = valorDoServiço;
+    sendObj.IBSCBS.vBC = Number(valorDoServiço.toFixed(2));
     sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
+    sendObj.IBSCBS.vIBSUF = parseFloat((valorDoServiço * 0.001).toFixed(2));
     sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
   }
 
@@ -461,9 +463,9 @@ function App() {
           }
         }
       )
-      // setSendObj(data)
+      setSendObj(data)
     } catch (e) {
-      console.log(e)
+      toast.error("Erro ao recuperar a nota escolhida")
     }
   }
 
@@ -474,11 +476,17 @@ function App() {
     buscarCteEscolhida()
   }, [escolhaCte])
 
+
+  useEffect(() => {
+    if (!destino) return
+    calcularFrete(saida, destino)
+  }, [quantidadeCarga])
+
   useEffect(() => {
     const loadTabela = async () => {
       try {
         setLoadingTabela(true);
-        const resultado = await carregarTabela();
+        await carregarTabela();
         setTimeout(() => {
           setLoadingTabela(false);
         }, 100);
@@ -492,10 +500,6 @@ function App() {
     getToken()
   }, []);
 
-  useEffect(() => {
-    if (!destino) return
-    calcularFrete(saida, destino)
-  }, [quantidadeCarga])
 
   if (loading || loadingTabela) {
     return (
@@ -1005,7 +1009,7 @@ function App() {
 
 
 
-                  <div className="flex justify-center p-6">
+                  <div className="flex justify-center p-6 gap-2">
                     <button
                       type="button"
                       onClick={() => loadingData()}
@@ -1015,7 +1019,7 @@ function App() {
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
-                        Buscar
+                        Buscar Informações
                       </span>
                     </button>
                     <button

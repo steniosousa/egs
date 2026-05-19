@@ -48,7 +48,7 @@ export let sendObj = {
     "CSTCOFINS": null,
     "ICMS_PREDBC": 0.0,
     "ICMS_VALORBC": 0.0,
-    "ICMS_ALIQICMS": 0.0,
+    "ICMS_ALIQICMS": 12.0,
     "ICMS_VALORICMS": 0.0,
     "ICMS_VALORCREDPRESOUTORGADO": 0.0,
     "VALORINSS": 0.0,
