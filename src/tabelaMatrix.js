@@ -4,7 +4,13 @@ let tabelaData = null;
 
 export const carregarTabela = async () => {
   try {
+    console.log('Tentando carregar tabela de fretes...');
     const response = await fetch('/TABELA MATRIZ.xlsx');
+    
+    if (!response.ok) {
+      throw new Error(`Erro ao carregar arquivo: ${response.status} ${response.statusText}`);
+    }
+    
     const arrayBuffer = await response.arrayBuffer();
     
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -23,10 +29,11 @@ export const carregarTabela = async () => {
     });
     
     tabelaData = data;
+    console.log(`Tabela carregada com sucesso: ${data.length} registros`);
     return data;
   } catch (error) {
     console.error('Erro ao carregar tabela:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -75,6 +82,7 @@ export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
     return valor;
   }
   
+  console.warn(`Cidade/UF não encontrada na tabela: ${cidade}/${uf} para tipo de caminhão: ${tipoCaminhao}`);
   return null;
 };
 

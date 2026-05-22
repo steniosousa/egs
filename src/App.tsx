@@ -4,6 +4,7 @@ import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton
 // import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { processarCNH, DadosCNH } from './pdfProcessor';
 
 function App() {
   const token = localStorage.getItem('token');
@@ -34,6 +35,8 @@ function App() {
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
+  const [cnhFile, setCnhFile] = useState<File | null>(null)
+  const [dadosCNH, setDadosCNH] = useState<DadosCNH>({ nome: '', cpf: '', categoria: '', validade: '', dataNascimento: '' })
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -150,6 +153,27 @@ function App() {
       reader.readAsText(file);
     } else {
       toast.error("Por favor, selecione um arquivo XML válido.");
+    }
+  };
+
+  const handleCnhUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === "application/pdf") {
+      setCnhFile(file);
+      processarCNH(
+        file,
+        (message: string) => toast.info(message),
+        (dados: DadosCNH) => {
+          setDadosCNH(dados);
+          if (dados.cpf) {
+            formatarCpfCnpj(dados.cpf, 'motorista');
+          }
+          toast.success("Dados da CNH extraídos com sucesso!");
+        },
+        (error: string) => toast.error(error)
+      );
+    } else {
+      toast.error("Por favor, selecione um arquivo PDF válido.");
     }
   };
 
@@ -433,7 +457,7 @@ function App() {
     }
 
     if (!valorTabela || valorTabela === 0) {
-      toast.error("Valor do frete não encontrado")
+      toast.error(`Valor do frete não encontrado para ${destino.city}/${destino.uf} com caminhão de ${tipoCaminhao} toneladas`)
       return
     }
 
@@ -478,9 +502,9 @@ function App() {
 
 
   useEffect(() => {
-    if (!destino) return
+    if (!destino || !destino.city || !destino.uf || loadingTabela) return
     calcularFrete(saida, destino)
-  }, [quantidadeCarga])
+  }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
 
   useEffect(() => {
     const loadTabela = async () => {
@@ -1038,34 +1062,142 @@ function App() {
                 </form>
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Selecione um CT-e</h2>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {ctes.length > 0 ? (
-                    ctes.map((cte) => (
-                      <div
-                        key={cte.IDCTE}
-                        onClick={() => setEscolhaCte(cte.IDCTE)}
-                        className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition duration-200 border border-gray-200 hover:border-blue-300"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-semibold text-gray-800">CT-e: {cte.IDCTE}</p>
-                            <p className="text-sm text-gray-600">Remetente: {cte.REM_NOME}</p>
-                            <p className="text-sm text-gray-600">Origem: {cte.NOMECIDADEEMISSAO}</p>
-                            <p className="text-sm text-gray-600">Destino: {cte.NOMECIDADEFIMSERV}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-500">
-                              {new Date(cte.DATACREATE).toLocaleDateString('pt-BR')}
-                            </p>
+              <div>
+                <div className="bg-white rounded-lg shadow-lg p-6">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">Selecione um CT-e</h2>
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {ctes.length > 0 ? (
+                      ctes.map((cte) => (
+                        <div
+                          key={cte.IDCTE}
+                          onClick={() => setEscolhaCte(cte.IDCTE)}
+                          className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition duration-200 border border-gray-200 hover:border-blue-300"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-semibold text-gray-800">CT-e: {cte.IDCTE}</p>
+                              <p className="text-sm text-gray-600">Remetente: {cte.REM_NOME}</p>
+                              <p className="text-sm text-gray-600">Origem: {cte.NOMECIDADEEMISSAO}</p>
+                              <p className="text-sm text-gray-600">Destino: {cte.NOMECIDADEFIMSERV}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-500">
+                                {new Date(cte.DATACREATE).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
                           </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">Nenhum CT-e encontrado</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">Nenhum CT-e encontrado</p>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">PDF CNH do Motorista</h2>
+
+                  <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
+                    <div className="text-center">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar CNH</h3>
+                        <p className="text-sm text-gray-600 mb-4">Carregue o PDF da CNH para extrair os dados automaticamente</p>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-4">
+                        <label htmlFor="cnh-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
+
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+
+                            <p className="mb-2 text-sm text-gray-600">
+                              <span className="font-semibold text-blue-600">Clique para selecionar</span> ou arraste o arquivo PDF aqui
+                            </p>
+                            <p className="text-xs text-gray-500">Apenas arquivos .pdf (máx. 10MB)</p>
+                          </div>
+                          <input
+                            id="cnh-upload"
+                            name="cnh-upload"
+                            type="file"
+                            accept=".pdf"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onChange={handleCnhUpload}
+                          />
+                        </label>
+                      </div>
+
+                      {cnhFile && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center">
+                            <svg className="h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-sm font-medium text-green-800">
+                              Arquivo carregado: <span className="font-semibold">{cnhFile.name}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCnhFile(null)}
+                              className="ml-auto text-sm text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {(dadosCNH.nome || dadosCNH.cpf) && (
+                    <div className="mt-6 bg-gray-50 rounded-lg p-6 border border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Dados Extraídos da CNH</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.nome}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, nome: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.cpf}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, cpf: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.categoria}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, categoria: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Validade</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.validade}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, validade: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.dataNascimento}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, dataNascimento: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,7 +1,0 @@
-compro/tributos
-
-Valor B.C. ICMS igual ao valor do serviço
-
-
-
-criar tela de emissao: Finalidade CT-e* === 0 - CT-e Normal
