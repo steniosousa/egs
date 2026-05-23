@@ -4,7 +4,7 @@ import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton
 // import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { processarCNH, DadosCNH } from './pdfProcessor';
+import { processarDocumento } from './pdfProcessor';
 
 function App() {
   const token = localStorage.getItem('token');
@@ -18,7 +18,7 @@ function App() {
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [produtoPredominante, setProdutoPredominante] = useState<string>('');
   const [placaVeiculoTração, setPlacaVeiculoTração] = useState<string>('');
-  const [motorista, setMotorista] = useState<string>('')
+  const [proprietario, setMotorista] = useState<string>('')
   const [veiculoNome, setVeiculoNome] = useState('')
   const [motoristaNome, setMotoristaNome] = useState('')
   const [remeteneNome, setRemetenteNome] = useState('')
@@ -36,7 +36,7 @@ function App() {
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
   const [cnhFile, setCnhFile] = useState<File | null>(null)
-  const [dadosCNH, setDadosCNH] = useState<DadosCNH>({ nome: '', cpf: '', categoria: '', validade: '', dataNascimento: '' })
+  const [dadosCNH, setDadosCNH] = useState({ proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -156,24 +156,60 @@ function App() {
     }
   };
 
-  const handleCnhUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCnhUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
-    if (file && file.type === "application/pdf") {
+
+    if (file && file.type === 'application/pdf') {
       setCnhFile(file);
-      processarCNH(
-        file,
-        (message: string) => toast.info(message),
-        (dados: DadosCNH) => {
-          setDadosCNH(dados);
-          if (dados.cpf) {
-            formatarCpfCnpj(dados.cpf, 'motorista');
-          }
-          toast.success("Dados da CNH extraídos com sucesso!");
+
+      processarDocumento(file, {
+        onProgress: (message: string) => {
+          toast.info(message);
         },
-        (error: string) => toast.error(error)
-      );
+
+        onSuccess: (dados) => {
+          setDadosCNH({
+            proprietario: dados.proprietario || '',
+            local: dados.local || '',
+            cpf: dados.cpf || '',
+            categoria: dados.categoria || '',
+            validade: dados.validade || '',
+            renavam: dados.renavam || '',
+            placa: dados.placa || '',
+            carroceria: dados.carroceria || '',
+            modelo: dados.modelo || '',
+            capacidade: dados.capacidade || '',
+            peso: dados.peso || ''
+          });
+
+          if (dados.cpf) {
+            formatarCpfCnpj(
+              dados.cpf,
+              'proprietario'
+            );
+          }
+
+          if (dados.placa) {
+            setPlacaVeiculoTração(
+              dados.placa
+            );
+          }
+
+          toast.success(
+            'Dados da CNH extraídos com sucesso!'
+          );
+        },
+
+        onError: (error: string) => {
+          toast.error(error);
+        },
+      });
     } else {
-      toast.error("Por favor, selecione um arquivo PDF válido.");
+      toast.error(
+        'Por favor, selecione um arquivo PDF válido.'
+      );
     }
   };
 
@@ -214,7 +250,7 @@ function App() {
       setCpfCnpjDestinatario(formattedValue);
     } else if (path === 'Remetente') {
       setCpfCnpjRemetente(formattedValue);
-    } else if (path === 'motorista') {
+    } else if (path === 'proprietario') {
       setMotorista(formattedValue);
     }
   }
@@ -222,8 +258,8 @@ function App() {
   const loadingData = async () => {
     try {
 
-      if (!cpfCnpjDestinatario || !cpfCnpjRemetente || !placaVeiculoTração || !motorista) {
-        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
+      if (!cpfCnpjDestinatario || !cpfCnpjRemetente || !placaVeiculoTração || !proprietario) {
+        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do proprietario para continuar")
         return
       }
 
@@ -258,7 +294,7 @@ function App() {
           }
         }),
         axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
-          "search": motorista,
+          "search": proprietario,
           "id": null,
           "propertyList": []
         },
@@ -493,49 +529,49 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    if (!escolhaCte || escolhaCte === 0) {
-      return
-    }
-    buscarCteEscolhida()
-  }, [escolhaCte])
+  // useEffect(() => {
+  //   if (!escolhaCte || escolhaCte === 0) {
+  //     return
+  //   }
+  //   buscarCteEscolhida()
+  // }, [escolhaCte])
 
 
-  useEffect(() => {
-    if (!destino || !destino.city || !destino.uf || loadingTabela) return
-    calcularFrete(saida, destino)
-  }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
+  // useEffect(() => {
+  //   if (!destino || !destino.city || !destino.uf || loadingTabela) return
+  //   calcularFrete(saida, destino)
+  // }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
 
-  useEffect(() => {
-    const loadTabela = async () => {
-      try {
-        setLoadingTabela(true);
-        await carregarTabela();
-        setTimeout(() => {
-          setLoadingTabela(false);
-        }, 100);
-      } catch (error) {
-        toast.error('Erro ao carregar tabela de fretes');
-        setLoadingTabela(false);
-      }
-    };
+  // useEffect(() => {
+  //   const loadTabela = async () => {
+  //     try {
+  //       setLoadingTabela(true);
+  //       await carregarTabela();
+  //       setTimeout(() => {
+  //         setLoadingTabela(false);
+  //       }, 100);
+  //     } catch (error) {
+  //       toast.error('Erro ao carregar tabela de fretes');
+  //       setLoadingTabela(false);
+  //     }
+  //   };
 
-    loadTabela();
-    getToken()
-  }, []);
+  //   loadTabela();
+  //   getToken()
+  // }, []);
 
 
-  if (loading || loadingTabela) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg">
-          <p className="mt-4 text-gray-600">
-            {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // if (loading || loadingTabela) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+  //       <div className="bg-white p-8 rounded-lg shadow-lg">
+  //         <p className="mt-4 text-gray-600">
+  //           {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -822,7 +858,7 @@ function App() {
                             <span className="text-sm text-gray-500">{veiculoNome}</span>
                           </div>
                           <div className="space-y-2">
-                            <label htmlFor="motorista" className="block text-sm font-semibold text-gray-700 flex items-center">
+                            <label htmlFor="proprietario" className="block text-sm font-semibold text-gray-700 flex items-center">
                               <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
                               </svg>
@@ -830,12 +866,12 @@ function App() {
                             </label>
                             <input
                               type="text"
-                              value={motorista}
+                              value={proprietario}
                               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                formatarCpfCnpj(e.target.value, 'motorista');
+                                formatarCpfCnpj(e.target.value, 'proprietario');
                               }}
-                              id="motorista"
-                              name="motorista"
+                              id="proprietario"
+                              name="proprietario"
                               className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                               placeholder="000.000.000-00"
                             />
@@ -1148,21 +1184,21 @@ function App() {
                     </div>
                   </div>
 
-                  {(dadosCNH.nome || dadosCNH.cpf) && (
+                  {(dadosCNH.local || dadosCNH.cpf) && (
                     <div className="mt-6 bg-gray-50 rounded-lg p-6 border border-gray-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">Dados Extraídos da CNH</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CIDADE/UF</label>
                           <input
                             type="text"
-                            value={dadosCNH.nome}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, nome: e.target.value })}
+                            value={dadosCNH.local?.slice(-2) || ''}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, local: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ DO PROPRIETÁRIO</label>
                           <input
                             type="text"
                             value={dadosCNH.cpf}
@@ -1171,32 +1207,70 @@ function App() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">PROPRIETÁRIO</label>
                           <input
                             type="text"
-                            value={dadosCNH.categoria}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, categoria: e.target.value })}
+                            value={dadosCNH.proprietario}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, proprietario: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Validade</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Carroceria</label>
                           <input
                             type="text"
-                            value={dadosCNH.validade}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, validade: e.target.value })}
+                            value={dadosCNH.carroceria}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, carroceria: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
                           <input
                             type="text"
-                            value={dadosCNH.dataNascimento}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, dataNascimento: e.target.value })}
+                            value={dadosCNH.modelo}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, modelo: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">RENAVAM</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.renavam}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, renavam: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CAPACIDADE</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.capacidade}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, capacidade: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">PESO</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.peso}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, peso: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">PLACA</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.placa}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, placa: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+
                       </div>
                     </div>
                   )}

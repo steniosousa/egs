@@ -1,163 +1,515 @@
 import Tesseract from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configura o worker do PDF.js usando o arquivo local na pasta public
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// =========================================================
+// CONFIG PDF.JS
+// =========================================================
 
-export interface DadosCNH {
-  nome: string;
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  '/pdf.worker.min.mjs';
+
+// =========================================================
+// TYPES
+// =========================================================
+
+export interface DadosDocumento {
+  tipoDocumento: 'CRLV' | 'CNH' | 'DESCONHECIDO';
+
+  proprietario: string;
+  local: string;
   cpf: string;
+
   categoria: string;
   validade: string;
-  dataNascimento: string;
+
+  renavam: string;
+  placa: string;
+  carroceria: string;
+  modelo: string
+  capacidade: string
+  peso: string
 }
 
-export const processarCNH = async (
-  file: File,
-  onProgress?: (message: string) => void,
-  onSuccess?: (dados: DadosCNH) => void,
-  onError?: (error: string) => void
-): Promise<DadosCNH> => {
-  try {
-    if (onProgress) onProgress("Processando PDF da CNH. Isso pode levar alguns segundos...");
-    
-    // Lê o arquivo como ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
+interface ProcessarDocumentoOptions {
+  onProgress?: (message: string) => void;
+  onSuccess?: (dados: DadosDocumento) => void;
+  onError?: (error: string) => void;
+}
 
-    // Carrega o documento PDF
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+// =========================================================
+// CONSTANTES
+// =========================================================
+
+const INVALID_NAMES = [
+  'LOCAL',
+  'DATA',
+  'CPF',
+  'CNPJ',
+  'INFORMACOES',
+  'INFORMAÇÕES',
+  'OBSERVACOES',
+  'OBSERVAÇÕES',
+  'SENATRAN',
+  'QRCODE',
+  'REPÚBLICA',
+  'FEDERATIVA',
+  'BRASIL',
+  'DETRAN',
+  'RENAVAM',
+  'CRLV',
+  'DIGITAL',
+  'INFORMA',
+  "INFORMAÇÕES",
+];
+
+// =========================================================
+// MAIN
+// =========================================================
+
+export const processarDocumento = async (
+  file: File,
+  options?: ProcessarDocumentoOptions
+): Promise<DadosDocumento> => {
+  const { onProgress, onSuccess, onError } =
+    options || {};
+
+  try {
+    onProgress?.('Lendo documento...');
+
+    const arrayBuffer =
+      await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({
+      data: arrayBuffer,
+    }).promise;
 
     let fullText = '';
 
-    // Processa cada página do PDF
+    // =====================================================
+    // EXTRAÇÃO NATIVA
+    // =====================================================
+
     for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-
-      // Renderiza a página em um canvas
-      const scale = 2.0; // Aumenta a escala para melhor qualidade do OCR
-      const viewport = page.getViewport({ scale });
-
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      await page.render({
-        canvasContext: context!,
-        viewport,
-        canvas
-      }).promise;
-
-      // Converte o canvas para imagem
-      const imageUrl = canvas.toDataURL('image/png');
-
-      // Realiza OCR na imagem usando Tesseract.js
-      const { data: { text } } = await Tesseract.recognize(
-        imageUrl,
-        'por',
-        {
-          logger: (m: any) => {
-            if (m.status === 'recognizing text' && onProgress) {
-              onProgress(`Página ${i}/${pdf.numPages} - Progresso: ${Math.round(m.progress * 100)}%`);
-            }
-          }
-        }
+      onProgress?.(
+        `Extraindo página ${i}/${pdf.numPages}...`
       );
 
-      fullText += text + '\n';
+      const page = await pdf.getPage(i);
+
+      const textContent =
+        await page.getTextContent();
+
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join('\n');
+
+      fullText += pageText + '\n';
     }
 
-    console.log('Texto extraído do PDF:', fullText);
+    // =====================================================
+    // FALLBACK OCR
+    // =====================================================
 
-    // Extrai dados do texto da CNH usando regex
-    const dadosExtraidos = extrairDadosCNH(fullText);
+    if (fullText.trim().length < 100) {
+      fullText = '';
 
-    if (dadosExtraidos.nome || dadosExtraidos.cpf) {
-      if (onSuccess) onSuccess(dadosExtraidos);
+      for (let i = 1; i <= pdf.numPages; i++) {
+        onProgress?.(
+          `OCR página ${i}/${pdf.numPages}...`
+        );
+
+        const page = await pdf.getPage(i);
+
+        const viewport = page.getViewport({
+          scale: 2.5,
+        });
+
+        const canvas =
+          document.createElement('canvas');
+
+        const context = canvas.getContext(
+          '2d'
+        ) as CanvasRenderingContext2D;
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+          canvas,
+        }).promise;
+
+        const blob =
+          await new Promise<Blob | null>(
+            (resolve) =>
+              canvas.toBlob(
+                resolve,
+                'image/png'
+              )
+          );
+
+        if (!blob) continue;
+
+        const result =
+          await Tesseract.recognize(
+            blob,
+            'por',
+            {
+              logger: (m: any) => {
+                if (
+                  m.status ===
+                  'recognizing text'
+                ) {
+                  onProgress?.(
+                    `OCR ${i}/${pdf.numPages} - ${Math.round(
+                      m.progress * 100
+                    )}%`
+                  );
+                }
+              },
+            }
+          );
+
+        fullText += result.data.text + '\n';
+      }
+    }
+
+    // =====================================================
+    // LIMPEZA TEXTO
+    // =====================================================
+
+    fullText = limparTexto(fullText);
+
+    // console.log(
+    //   'Texto final extraído:',
+    //   fullText
+    // );
+
+    // =====================================================
+    // DETECTAR DOCUMENTO
+    // =====================================================
+
+    let dados: DadosDocumento;
+
+    if (
+      fullText.includes(
+        'CERTIFICADO DE REGISTRO'
+      )
+    ) {
+      dados = extrairCRLV(fullText);
+    } else if (
+      fullText.includes(
+        'CARTEIRA NACIONAL'
+      )
+    ) {
+      dados = extrairCNH(fullText);
     } else {
-      if (onError) onError("Não foi possível extrair os dados da CNH automaticamente. Por favor, preencha manualmente.");
+      dados = {
+        tipoDocumento: 'DESCONHECIDO',
+        proprietario: '',
+        local: '',
+        cpf: '',
+        categoria: '',
+        validade: '',
+        renavam: '',
+        placa: '',
+        carroceria: '',
+        modelo: '',
+        capacidade: '',
+        peso: ''
+      };
     }
 
-    return dadosExtraidos;
 
+    if (
+      dados.local ||
+      dados.proprietario ||
+      dados.cpf ||
+      dados.placa ||
+      dados.renavam
+    ) {
+      onSuccess?.(dados);
+    } else {
+      onError?.(
+        'Não foi possível extrair os dados.'
+      );
+    }
+
+    return dados;
   } catch (error) {
-    console.error('Erro ao processar CNH:', error);
-    if (onError) onError("Erro ao processar o arquivo PDF da CNH.");
+    console.error(
+      'Erro ao processar documento:',
+      error
+    );
+
+    onError?.('Erro ao processar documento.');
+
     throw error;
   }
 };
 
-const extrairDadosCNH = (texto: string): DadosCNH => {
-  const dados: DadosCNH = {
-    nome: '',
+// =========================================================
+// CRLV
+// =========================================================
+
+const extrairCRLV = (
+  texto: string
+): DadosDocumento => {
+  const dados: DadosDocumento = {
+    tipoDocumento: 'CRLV',
+
+    proprietario: '',
+    local: '',
     cpf: '',
+
     categoria: '',
     validade: '',
-    dataNascimento: ''
+
+    renavam: '',
+    placa: '',
+    carroceria: '',
+    modelo: '',
+    capacidade: '',
+    peso: ''
   };
 
   try {
-    // Extrair CPF (formato: XXX.XXX.XXX-XX ou XXXXXXXXXXX)
-    const cpfMatch = texto.match(/(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/);
-    if (cpfMatch) {
-      dados.cpf = cpfMatch[1];
+    // =====================================================
+    // CPF
+    // =====================================================
+
+    const cpfs = texto.match(
+      /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g
+    );
+
+    if (cpfs?.length) {
+      dados.cpf = cpfs[cpfs.length - 1];
     }
 
-    // Extrair Nome (geralmente aparece após "Nome" ou está em destaque)
-    // Tenta vários padrões comuns
-    const nomePatterns = [
-      /Nome[:\s]+([A-Z\s]+?)(?=\n|$)/i,
-      /NOME[:\s]+([A-Z\s]+?)(?=\n|$)/i,
-      /([A-Z][A-Z\s]+[A-Z])(?=\s+CPF)/i,
-    ];
+    // =====================================================
+    // PLACA
+    // =====================================================
 
-    for (const pattern of nomePatterns) {
-      const match = texto.match(pattern);
-      if (match && match[1]) {
-        dados.nome = match[1].trim();
-        break;
+    const placaMatch = texto.match(
+      /\b[A-Z]{3}[0-9][A-Z0-9][0-9]{2}\b/
+    );
+
+    if (placaMatch) {
+      dados.placa = placaMatch[0];
+    }
+
+    // =====================================================
+    // RENAVAM
+    // =====================================================
+
+    const numeros11 = texto.match(
+      /\b\d{11}\b/g
+    );
+
+    if (numeros11?.length) {
+      dados.renavam = numeros11[0];
+    }
+
+    // =====================================================
+    // LOCAL
+    // =====================================================
+
+    const linhas = texto.split('\n');
+
+    for (const linha of linhas) {
+      const cleaned = linha.trim();
+
+      if (
+        cleaned.length > 10 &&
+        /^[A-ZÀ-Ú\s]+$/.test(cleaned) &&
+        !INVALID_NAMES.some((v) =>
+          cleaned.includes(v)
+        )
+      ) {
+        dados.local = cleaned;
       }
     }
 
-    // Extrair Categoria (geralmente é uma letra como A, B, C, D, E, etc.)
-    const categoriaMatch = texto.match(/Categoria[:\s]+([A-Z])/i);
-    if (categoriaMatch) {
-      dados.categoria = categoriaMatch[1];
+    // =====================================================
+    // CARROCERIA
+    // =====================================================
+
+    const tiposDeCarroceria = {
+      "CARROCERIA ABERTA": "CARROCERIA ABERTA",
+      "CABINE ESTENDIDA": "CABINE ESTENDIDA",
+      "CARROCERIA FECHADA": "CARROCERIA FECHADA",
+    }
+    const carroceriaMatch = Object.keys(tiposDeCarroceria).find((key) =>
+      texto.includes(key)
+    );
+
+    if (carroceriaMatch) {
+      dados.carroceria = tiposDeCarroceria[carroceriaMatch as keyof typeof tiposDeCarroceria];
     }
 
-    // Extrair Validade (formato de data brasileiro: DD/MM/AAAA ou DD/MM/AA)
-    const validadePatterns = [
-      /Validade[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-      /Valid[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-      /Exp[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-    ];
 
-    for (const pattern of validadePatterns) {
-      const match = texto.match(pattern);
-      if (match && match[1]) {
-        dados.validade = match[1];
-        break;
+    //MOTORISTA
+
+    if (carroceriaMatch === "CARROCERIA FECHADA") {
+      const proprietario = texto.split('CARROCERIA FECHADA')[1]?.trim().split('\n')[0];
+      if (proprietario) {
+        dados.proprietario = proprietario;
+      }
+    } else if (carroceriaMatch === "CARROCERIA ABERTA") {
+      const proprietario = texto.split('CARROCERIA ABERTA')[1]?.trim().split('\n')[0];
+      if (proprietario) {
+        dados.proprietario = proprietario;
+      }
+    } else {
+      //fallback
+      const proprietario = texto.split('CABINE ESTENDIDA')[1]?.trim().split('\n')[0];
+      if (proprietario) {
+        dados.proprietario = proprietario;
       }
     }
 
-    // Extrair Data de Nascimento
-    const nascimentoPatterns = [
-      /Nascimento[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-      /Data\s+Nasc[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-      /Dt\.?\s*Nasc[:\s]+(\d{2}\/\d{2}\/\d{4})/i,
-    ];
+    //modelo
+    // ***
+    // M.BENZ/L 1620
 
-    for (const pattern of nascimentoPatterns) {
-      const match = texto.match(pattern);
-      if (match && match[1]) {
-        dados.dataNascimento = match[1];
-        break;
-      }
+
+    const modelo = texto.split('***')[1]?.trim().split('\n')[0];
+    if (modelo) {
+      dados.modelo = modelo;
     }
+
+
+    //capacidade
+    const capacidade = texto.split('ALUGUEL')[1]?.trim().split('\n')[0]
+    if (capacidade) {
+      dados.capacidade = capacidade;
+    }
+
+
+    //peso
+    const peso = texto.split('/****')[1]?.trim().split('\n')[0]
+    if (peso) {
+      dados.peso = peso;
+    }
+
 
   } catch (error) {
-    console.error('Erro ao extrair dados:', error);
+    console.error(
+      'Erro ao extrair CRLV:',
+      error
+    );
   }
 
   return dados;
+};
+
+// =========================================================
+// CNH
+// =========================================================
+
+const extrairCNH = (
+  texto: string
+): DadosDocumento => {
+  const dados: DadosDocumento = {
+    tipoDocumento: 'CNH',
+
+    proprietario: '',
+    local: '',
+    cpf: '',
+
+    categoria: '',
+    validade: '',
+
+    renavam: '',
+    placa: '',
+    carroceria: '',
+    modelo: '',
+    capacidade: '',
+    peso: ''
+  };
+
+  try {
+    // CPF
+
+    const cpfMatch = texto.match(
+      /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/
+    );
+
+    if (cpfMatch) {
+      dados.cpf = cpfMatch[0];
+    }
+
+    // CATEGORIA
+
+    const categoriaMatch = texto.match(
+      /\b(ACC|A|B|C|D|E|AB|AC|AD|AE)\b/
+    );
+
+    if (categoriaMatch) {
+      dados.categoria = categoriaMatch[0];
+    }
+
+    // DATAS
+
+    const datas = texto.match(
+      /\b\d{2}\/\d{2}\/\d{4}\b/g
+    );
+
+    if (datas && datas.length >= 2) {
+      dados.validade = datas[1];
+    }
+
+    // NOME
+
+    const linhas = texto.split('\n');
+
+    for (const linha of linhas) {
+      const cleaned = linha.trim();
+
+      if (
+        cleaned.length > 10 &&
+        /^[A-ZÀ-Ú\s]+$/.test(cleaned) &&
+        !INVALID_NAMES.some((v) =>
+          cleaned.includes(v)
+        )
+      ) {
+        dados.local = cleaned;
+      }
+    }
+  } catch (error) {
+    console.error(
+      'Erro ao extrair CNH:',
+      error
+    );
+  }
+
+  return dados;
+};
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+const limparTexto = (texto: string) => {
+  return texto
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .replace(
+      /Valide este QRCode.*?Vio/gi,
+      ''
+    )
+    .replace(/QRCode/gi, '')
+    .replace(
+      /Documento emitido por CDT.*/gi,
+      ''
+    )
+    .trim();
+};
+
+const limparCampo = (valor: string) => {
+  return valor
+    .replace(/\s+/g, ' ')
+    .trim();
 };
