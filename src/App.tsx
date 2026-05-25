@@ -1,10 +1,10 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton, buscarValor32_35Ton, buscarValor38_40Ton, buscarValor50Ton } from "./tabelaMatrix";
-// import { sendObj } from "./send";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { processarDocumento } from './pdfProcessor';
+import { proprietário, veiculo } from "./send";
 
 function App() {
   const token = localStorage.getItem('token');
@@ -18,7 +18,7 @@ function App() {
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [produtoPredominante, setProdutoPredominante] = useState<string>('');
   const [placaVeiculoTração, setPlacaVeiculoTração] = useState<string>('');
-  const [proprietario, setMotorista] = useState<string>('')
+  const [motorista, setMotorista] = useState<string>('')
   const [veiculoNome, setVeiculoNome] = useState('')
   const [motoristaNome, setMotoristaNome] = useState('')
   const [remeteneNome, setRemetenteNome] = useState('')
@@ -36,7 +36,7 @@ function App() {
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
   const [cnhFile, setCnhFile] = useState<File | null>(null)
-  const [dadosCNH, setDadosCNH] = useState({ proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
+  const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -181,7 +181,11 @@ function App() {
             carroceria: dados.carroceria || '',
             modelo: dados.modelo || '',
             capacidade: dados.capacidade || '',
-            peso: dados.peso || ''
+            peso: dados.peso || '',
+            tipoProprietario: '',
+            tipoCarroceria: '',
+            rntc: '',
+            tipoVeiculo: ''
           });
 
           if (dados.cpf) {
@@ -258,8 +262,8 @@ function App() {
   const loadingData = async () => {
     try {
 
-      if (!cpfCnpjDestinatario || !cpfCnpjRemetente || !placaVeiculoTração || !proprietario) {
-        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do proprietario para continuar")
+      if (!cpfCnpjDestinatario || !cpfCnpjRemetente || !placaVeiculoTração || !motorista) {
+        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
         return
       }
 
@@ -294,7 +298,7 @@ function App() {
           }
         }),
         axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
-          "search": proprietario,
+          "search": motorista,
           "id": null,
           "propertyList": []
         },
@@ -529,49 +533,154 @@ function App() {
     }
   }
 
-  // useEffect(() => {
-  //   if (!escolhaCte || escolhaCte === 0) {
-  //     return
-  //   }
-  //   buscarCteEscolhida()
-  // }, [escolhaCte])
+  const verificarSeProprietarioTaCadastrado = async () => {
+    const cpf = dadosCNH.cpf;
+
+    if (!cpf) {
+      toast.error("INFORME O CPF DO PROPRIETÁRIO")
+      return
+    }
+    try {
+      const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//odata/Gcadastro`, {
+        params: {
+          $filter: `(contains(tolower(CPFCNPJ), '${cpf}')) and (STATUS ne 'C')`,
+          $count: true,
+          $top: 20
+        },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (data.value[0]) {
+        toast.info("Proprietário já cadastrado")
+        return
+      }
+
+      criarProprietario()
+
+    } catch (e) {
+      toast.error("Erro ao verificar se motorista está cadastrado")
+    }
+  }
+  const verificarSeVeiculoTaCadastrado = async () => {
+    try {
+      const placa = dadosCNH.placa;
+      const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//odata/Gveiculo`, {
+        params: {
+          $filter: `(contains(tolower(PLACA), '${placa}')) and (STATUS ne 'C')`,
+          $count: true,
+          $top: 20
+        },
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (!data.value[0]) {
+        criarVeiculo()
+      }
+    } catch {
+      toast.error("Erro ao verificar se veiculo está cadastrado")
+
+    }
+  }
+
+  const criarVeiculo = async () => {
+    veiculo.PLACA = dadosCNH.placa
+    veiculo.CAPACIDADEKG = Number(dadosCNH.capacidade)
+    veiculo.TARA = Number(dadosCNH.peso)
+    veiculo.UF = dadosCNH.local?.slice(-2)
+    veiculo.DESCRICAO = dadosCNH.modelo
+    veiculo.RENAVAN = dadosCNH.renavam
+    veiculo.TIPOPROPRIETARIO = dadosCNH.tipoProprietario
+    veiculo.TIPOCARROCERIA = dadosCNH.tipoCarroceria
+    veiculo.TIPOVEICULO = dadosCNH.tipoVeiculo
+    veiculo.RNTC = dadosCNH.rntc
+
+    if (!dadosCNH.placa || !dadosCNH.capacidade || !dadosCNH.peso || !dadosCNH.local || !dadosCNH.modelo || !dadosCNH.renavam || !dadosCNH.tipoProprietario || !dadosCNH.tipoCarroceria || !dadosCNH.tipoVeiculo || !dadosCNH.rntc) {
+      toast.error("INFORME A PLACA, CAPACIDADE, PESO, LOCAL, MODELO, RENAVAM, TIPO DE PROPRIETÁRIO, TIPO DE CARROCERIA, TIPO DE VEÍCULO E RNTC")
+      return
+    }
+
+    try {
+      await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GveiculoApi/Post',
+        veiculo,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      )
+      toast.success("Veículo cadastrado com sucesso!")
+    } catch {
+      toast.error("Erro ao criar veículo")
+    }
+  }
+
+  const criarProprietario = async () => {
+    if (!dadosCNH.cpf || !dadosCNH.proprietario) {
+      toast.error("INFORME O CPF E O NOME DO PROPRIETÁRIO")
+      return
+    }
+    try {
+      await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GcadastroApi/post',
+        proprietário,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      )
+      toast.success("Proprietário cadastrado com sucesso!")
+    } catch (e) {
+      toast.error("Erro ao criar proprietário")
+    }
+  }
+
+  useEffect(() => {
+    if (!escolhaCte || escolhaCte === 0) {
+      return
+    }
+    buscarCteEscolhida()
+  }, [escolhaCte])
 
 
-  // useEffect(() => {
-  //   if (!destino || !destino.city || !destino.uf || loadingTabela) return
-  //   calcularFrete(saida, destino)
-  // }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
+  useEffect(() => {
+    if (!destino || !destino.city || !destino.uf || loadingTabela) return
+    calcularFrete(saida, destino)
+  }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
 
-  // useEffect(() => {
-  //   const loadTabela = async () => {
-  //     try {
-  //       setLoadingTabela(true);
-  //       await carregarTabela();
-  //       setTimeout(() => {
-  //         setLoadingTabela(false);
-  //       }, 100);
-  //     } catch (error) {
-  //       toast.error('Erro ao carregar tabela de fretes');
-  //       setLoadingTabela(false);
-  //     }
-  //   };
+  useEffect(() => {
+    const loadTabela = async () => {
+      try {
+        setLoadingTabela(true);
+        await carregarTabela();
+        setTimeout(() => {
+          setLoadingTabela(false);
+        }, 100);
+      } catch (error) {
+        toast.error('Erro ao carregar tabela de fretes');
+        setLoadingTabela(false);
+      }
+    };
 
-  //   loadTabela();
-  //   getToken()
-  // }, []);
+    loadTabela();
+    getToken()
+  }, []);
 
 
-  // if (loading || loadingTabela) {
-  //   return (
-  //     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-  //       <div className="bg-white p-8 rounded-lg shadow-lg">
-  //         <p className="mt-4 text-gray-600">
-  //           {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
-  //         </p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (loading || loadingTabela) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg shadow-lg">
+          <p className="mt-4 text-gray-600">
+            {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -866,7 +975,7 @@ function App() {
                             </label>
                             <input
                               type="text"
-                              value={proprietario}
+                              value={motorista}
                               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                 formatarCpfCnpj(e.target.value, 'proprietario');
                               }}
@@ -1202,7 +1311,11 @@ function App() {
                           <input
                             type="text"
                             value={dadosCNH.cpf}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, cpf: e.target.value })}
+                            onChange={(e) => {
+                              setDadosCNH({ ...dadosCNH, cpf: e.target.value })
+                              proprietário.CPFCNPJ = e.target.value
+                            }
+                            }
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
@@ -1211,9 +1324,25 @@ function App() {
                           <input
                             type="text"
                             value={dadosCNH.proprietario}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, proprietario: e.target.value })}
+                            onChange={(e) => {
+                              setDadosCNH({ ...dadosCNH, proprietario: e.target.value })
+                              proprietário.RAZAOSOCIAL = e.target.value
+                            }}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE PROPRIETÁRIO</label>
+                          <select
+                            value={dadosCNH.tipoProprietario}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, tipoProprietario: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="0">TAC-AGREGADO</option>
+                            <option value="1">TAC-INDEPENDENTE</option>
+                            <option value="2">OUTROS</option>
+                          </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Carroceria</label>
@@ -1239,6 +1368,44 @@ function App() {
                             type="text"
                             value={dadosCNH.renavam}
                             onChange={(e) => setDadosCNH({ ...dadosCNH, renavam: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE CARROCERIA</label>
+                          <select
+                            value={dadosCNH.tipoCarroceria}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, tipoCarroceria: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="01">ABERTA</option>
+                            <option value="02">FECHADA/BAÚ</option>
+                            <option value="03">GRANELERA</option>
+                            <option value="00">NÃO APLICÁVEL</option>
+                            <option value="04">PORTA CONTAINER</option>
+                            <option value="05">SIDER</option>
+                            <option value="09">BASCULANTE</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE VEICULO</label>
+                          <select
+                            value={dadosCNH.tipoVeiculo}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, tipoVeiculo: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option value="R">REBOQUE</option>
+                            <option value="T">TRAÇÃO</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">RNTC</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.rntc}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, rntc: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
@@ -1271,6 +1438,15 @@ function App() {
                           />
                         </div>
 
+
+                      </div>
+                      <div className="flex gap-2 mt-10">
+                        <button onClick={verificarSeProprietarioTaCadastrado} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                          verificar / cadastrar proprietário
+                        </button>
+                        <button onClick={verificarSeVeiculoTaCadastrado} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                          verificar / cadastrar veiculo
+                        </button>
                       </div>
                     </div>
                   )}
