@@ -360,7 +360,7 @@ export let proprietário = {
     "CODFORMAPGTO": null,
     "IDTIPOOP": null,
     "IDTABFRETE": null,
-    "RNTC": null,
+    "RNTC": "00000000",
     "STATUS": null,
     "IDCCUSTO": null,
     "CATEGORIACADGERALOBRIGATORIO": false,

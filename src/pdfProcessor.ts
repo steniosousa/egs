@@ -60,6 +60,7 @@ const INVALID_NAMES = [
   'DIGITAL',
   'INFORMA',
   "INFORMAÇÕES",
+  "ALIENAÇÃO FIDUCIÁRIA"
 ];
 
 // =========================================================
@@ -280,9 +281,8 @@ const extrairCRLV = (
     // =====================================================
 
     const cpfs = texto.match(
-      /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g
+      /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/g
     );
-
     if (cpfs?.length) {
       dados.cpf = cpfs[cpfs.length - 1];
     }
@@ -315,21 +315,33 @@ const extrairCRLV = (
     // LOCAL
     // =====================================================
 
-    const linhas = texto.split('\n');
+const linhas = texto.split('\n');
 
-    for (const linha of linhas) {
-      const cleaned = linha.trim();
+let encontrouDocumento = false;
 
-      if (
-        cleaned.length > 10 &&
-        /^[A-ZÀ-Ú\s]+$/.test(cleaned) &&
-        !INVALID_NAMES.some((v) =>
-          cleaned.includes(v)
-        )
-      ) {
-        dados.local = cleaned;
-      }
+for (const linha of linhas) {
+  const cleaned = linha.trim();
+
+  console.log(cleaned);
+
+  // Detecta CPF ou CNPJ
+  const temDocumento = /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(cleaned);
+
+  if (temDocumento) {
+    encontrouDocumento = true;
+    continue;
+  }
+
+  // Próxima linha após CPF/CNPJ
+  if (encontrouDocumento) {
+    const matchUF = cleaned.match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
+
+    if (matchUF) {
+      dados.local = matchUF[1];
+      encontrouDocumento = false;
     }
+  }
+}
 
     // =====================================================
     // CARROCERIA
@@ -383,14 +395,14 @@ const extrairCRLV = (
     //capacidade
     const capacidade = texto.split('ALUGUEL')[1]?.trim().split('\n')[0]
     if (capacidade) {
-      dados.capacidade = capacidade;
+      dados.capacidade = (Number(capacidade) * 1000).toString();
     }
 
 
     //peso
     const peso = texto.split('/****')[1]?.trim().split('\n')[0]
     if (peso) {
-      dados.peso = peso;
+      dados.peso = (Number(peso) * 1000).toString();
     }
 
 

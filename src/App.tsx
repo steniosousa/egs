@@ -35,7 +35,7 @@ function App() {
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
-  const [cnhFile, setCnhFile] = useState<File | null>(null)
+  const [crlvFile, setCnhFile] = useState<File | null>(null)
   const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
 
   const processarXML = (xmlContent: string) => {
@@ -553,6 +553,8 @@ function App() {
       })
 
       if (data.value[0]) {
+        veiculo.IDCADASTRO = data.value[0].IDCADASTRO
+
         toast.info("Proprietário já cadastrado")
         return
       }
@@ -566,6 +568,11 @@ function App() {
   const verificarSeVeiculoTaCadastrado = async () => {
     try {
       const placa = dadosCNH.placa;
+
+      if (!placa) {
+        toast.error("Informe a placa do veículo")
+        return
+      }
       const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//odata/Gveiculo`, {
         params: {
           $filter: `(contains(tolower(PLACA), '${placa}')) and (STATUS ne 'C')`,
@@ -577,9 +584,13 @@ function App() {
         }
       })
 
-      if (!data.value[0]) {
-        criarVeiculo()
+
+
+      if (data.value[0]) {
+        toast.success("Veículo já cadastrado")
+        return
       }
+      criarVeiculo()
     } catch {
       toast.error("Erro ao verificar se veiculo está cadastrado")
 
@@ -588,8 +599,8 @@ function App() {
 
   const criarVeiculo = async () => {
     veiculo.PLACA = dadosCNH.placa
-    veiculo.CAPACIDADEKG = Number(dadosCNH.capacidade)
-    veiculo.TARA = Number(dadosCNH.peso)
+    veiculo.CAPACIDADEKG = parseInt(dadosCNH.capacidade)
+    veiculo.TARA = parseInt(dadosCNH.peso)
     veiculo.UF = dadosCNH.local?.slice(-2)
     veiculo.DESCRICAO = dadosCNH.modelo
     veiculo.RENAVAN = dadosCNH.renavam
@@ -619,12 +630,16 @@ function App() {
   }
 
   const criarProprietario = async () => {
-    if (!dadosCNH.cpf || !dadosCNH.proprietario) {
-      toast.error("INFORME O CPF E O NOME DO PROPRIETÁRIO")
+    if (!dadosCNH.cpf || !dadosCNH.proprietario || proprietário.RNTC === "00000000") {
+      toast.error("INFORME O CPF, O NOME DO PROPRIETÁRIO E O RNTC")
       return
     }
+
+    proprietário.RAZAOSOCIAL = dadosCNH.proprietario
+    proprietário.CPFCNPJ = dadosCNH.cpf.replace(/\D/g, '')
+
     try {
-      await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GcadastroApi/post',
+      const { data } = await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GcadastroApi/post',
         proprietário,
         {
           headers: {
@@ -632,6 +647,8 @@ function App() {
           }
         }
       )
+      veiculo.IDCADASTRO = data.value.IDCADASTRO
+
       toast.success("Proprietário cadastrado com sucesso!")
     } catch (e) {
       toast.error("Erro ao criar proprietário")
@@ -1241,17 +1258,17 @@ function App() {
                   </div>
                 </div>
                 <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-                  <h2 className="text-xl font-bold text-gray-800 mb-4">PDF CNH do Motorista</h2>
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">PDF CRLV do Motorista</h2>
 
                   <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
                     <div className="text-center">
                       <div className="mb-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar CNH</h3>
-                        <p className="text-sm text-gray-600 mb-4">Carregue o PDF da CNH para extrair os dados automaticamente</p>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar CRLV</h3>
+                        <p className="text-sm text-gray-600 mb-4">Carregue o CRLV da CNH para extrair os dados automaticamente</p>
                       </div>
 
                       <div className="border-t border-gray-200 pt-4">
-                        <label htmlFor="cnh-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
+                        <label htmlFor="crlv-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
 
                           <div className="flex flex-col items-center justify-center pt-5 pb-6">
 
@@ -1261,8 +1278,8 @@ function App() {
                             <p className="text-xs text-gray-500">Apenas arquivos .pdf (máx. 10MB)</p>
                           </div>
                           <input
-                            id="cnh-upload"
-                            name="cnh-upload"
+                            id="crlv-upload"
+                            name="crlv-upload"
                             type="file"
                             accept=".pdf"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1271,14 +1288,14 @@ function App() {
                         </label>
                       </div>
 
-                      {cnhFile && (
+                      {crlvFile && (
                         <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                           <div className="flex items-center">
                             <svg className="h-5 w-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span className="text-sm font-medium text-green-800">
-                              Arquivo carregado: <span className="font-semibold">{cnhFile.name}</span>
+                              Arquivo carregado: <span className="font-semibold">{crlvFile.name}</span>
                             </span>
                             <button
                               type="button"
@@ -1297,15 +1314,7 @@ function App() {
                     <div className="mt-6 bg-gray-50 rounded-lg p-6 border border-gray-200">
                       <h3 className="text-lg font-semibold text-gray-800 mb-4">Dados Extraídos da CNH</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">CIDADE/UF</label>
-                          <input
-                            type="text"
-                            value={dadosCNH.local?.slice(-2) || ''}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, local: e.target.value })}
-                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
-                        </div>
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ DO PROPRIETÁRIO</label>
                           <input
@@ -1331,7 +1340,27 @@ function App() {
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
-
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">RNTC do proprietário</label>
+                          <input
+                            type="text"
+                            value={proprietário.RNTC}
+                            onChange={(e) => {
+                              proprietário.RNTC = e.target.value
+                            }}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="h-4 border-b border-gray-300 w-full" />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CIDADE/UF</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.local?.slice(-2) || ''}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, local: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE PROPRIETÁRIO</label>
                           <select
@@ -1339,19 +1368,11 @@ function App() {
                             onChange={(e) => setDadosCNH({ ...dadosCNH, tipoProprietario: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           >
+                            <option>SELECIONAR</option>
                             <option value="0">TAC-AGREGADO</option>
                             <option value="1">TAC-INDEPENDENTE</option>
                             <option value="2">OUTROS</option>
                           </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Carroceria</label>
-                          <input
-                            type="text"
-                            value={dadosCNH.carroceria}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, carroceria: e.target.value })}
-                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
@@ -1378,6 +1399,7 @@ function App() {
                             onChange={(e) => setDadosCNH({ ...dadosCNH, tipoCarroceria: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           >
+                            <option>SELECIONAR</option>
                             <option value="01">ABERTA</option>
                             <option value="02">FECHADA/BAÚ</option>
                             <option value="03">GRANELERA</option>
@@ -1395,6 +1417,7 @@ function App() {
                             onChange={(e) => setDadosCNH({ ...dadosCNH, tipoVeiculo: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           >
+                            <option>SELECIONAR</option>
                             <option value="R">REBOQUE</option>
                             <option value="T">TRAÇÃO</option>
                           </select>
