@@ -7,6 +7,7 @@ import { processarDocumento } from './pdfProcessor';
 import { proprietário, veiculo } from "./send";
 
 function App() {
+  const [escolherEmpresa, setEscolherEmpresa] = useState('')
   const token = localStorage.getItem('token');
   const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
   const [loading, setLoading] = useState<boolean>(() => !token);
@@ -31,7 +32,7 @@ function App() {
   const [saida, setSaida] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [destino, setDestino] = useState<{ city: string, uf: string }>({ city: '', uf: '' })
   const [valorICMS, setValorICMS] = useState('0')
-  const [escolhaCte, setEscolhaCte] = useState<number>(0)
+  const [escolhaCte, setEscolhaCte] = useState<number | null>(null)
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
@@ -268,7 +269,7 @@ function App() {
       }
 
       const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
-        axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": cpfCnpjDestinatario,
           "id": null,
           "propertyList": []
@@ -278,7 +279,7 @@ function App() {
               'Authorization': 'Bearer ' + token,
             }
           }),
-        axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": cpfCnpjRemetente,
           "id": null,
           "propertyList": []
@@ -288,7 +289,7 @@ function App() {
               'Authorization': 'Bearer ' + token,
             }
           }),
-        axios.get("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GVEICULO", {
+        axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
           params: {
             "search": placaVeiculoTração,
             "tipoVeiculo": "T"
@@ -297,7 +298,7 @@ function App() {
             'Authorization': 'Bearer ' + token,
           }
         }),
-        axios.post("https://api.egssistemas.com.br/EGSCTE//api/ComboBox/GCADASTRO", {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": motorista,
           "id": null,
           "propertyList": []
@@ -370,7 +371,7 @@ function App() {
         return
       }
 
-      await axios.post("https://api.egssistemas.com.br/EGSCTE//api/CteApi/Salvar", sendObj, {
+      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
         headers: {
           'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
@@ -398,13 +399,11 @@ function App() {
         if (currentTime - tokenTime < (expiresIn - 300000)) {
           setLoading(false);
           getCTES()
-
           return;
         }
       }
 
-
-      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get("https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=50201&EGSERP=true");
+      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get(`https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=${escolherEmpresa === "NOVA" ? "2570123" : "50201"}&EGSERP=true`);
       setTimeout(async () => {
         try {
 
@@ -413,12 +412,12 @@ function App() {
           params.append('captcha', '');
           params.append('codigo2fa', '');
           params.append('grant_type', 'password');
-          params.append('username', 'FINANCEIRO');
-          params.append('password', 'inter2026');
+          params.append('username', escolherEmpresa === "NOVA" ? "HENRIQUE" : 'FINANCEIRO');
+          params.append('password', escolherEmpresa === "NOVA" ? "291546" : 'inter2026');
 
-          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post("https://api.egssistemas.com.br/EGSCTE/token", params, {
+          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
             headers: {
-              authorization: 'Basic NTAyMDE6ZWckeXN0ZW0='
+              authorization: escolherEmpresa === "NOVA" ? "Basic MjU3MDEyMzplZyR5c3RlbQ==" : 'Basic NTAyMDE6ZWckeXN0ZW0='
             }
           });
 
@@ -441,7 +440,7 @@ function App() {
 
   const getCTES = async () => {
     try {
-      const { data } = await axios.get('https://api.egssistemas.com.br/EGSCTE//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true',
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -520,7 +519,7 @@ function App() {
 
   const buscarCteEscolhida = async () => {
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//api/CteApi/GetCTe?IDCTE=${escolhaCte}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${escolhaCte}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -541,7 +540,7 @@ function App() {
       return
     }
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//odata/Gcadastro`, {
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/Gcadastro`, {
         params: {
           $filter: `(contains(tolower(CPFCNPJ), '${cpf}')) and (STATUS ne 'C')`,
           $count: true,
@@ -573,7 +572,7 @@ function App() {
         toast.error("Informe a placa do veículo")
         return
       }
-      const { data } = await axios.get(`https://api.egssistemas.com.br/EGSCTE//odata/Gveiculo`, {
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/Gveiculo`, {
         params: {
           $filter: `(contains(tolower(PLACA), '${placa}')) and (STATUS ne 'C')`,
           $count: true,
@@ -615,7 +614,7 @@ function App() {
     }
 
     try {
-      await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GveiculoApi/Post',
+      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
         veiculo,
         {
           headers: {
@@ -639,7 +638,7 @@ function App() {
     proprietário.CPFCNPJ = dadosCNH.cpf.replace(/\D/g, '')
 
     try {
-      const { data } = await axios.post('https://api.egssistemas.com.br/EGSCTE//api/GcadastroApi/post',
+      const { data } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
         proprietário,
         {
           headers: {
@@ -652,6 +651,35 @@ function App() {
       toast.success("Proprietário cadastrado com sucesso!")
     } catch (e) {
       toast.error("Erro ao criar proprietário")
+    }
+  }
+
+  const sair = async () => {
+    const currentToken = localStorage.getItem('token');
+    setLoading(true)
+    if(!currentToken){
+      toast.info("CLique novamente")
+      return
+    }
+    try {
+      await axios.post(
+        `https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
+        null,
+        {
+          headers: {
+            Authorization: `Bearer ${currentToken}`
+          },
+          withCredentials: true
+        }
+      );
+      setEscolhaCte(null)
+      setDadosCNH({ tipoVeiculo: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
+      setEscolherEmpresa("")
+      localStorage.clear()
+    } catch {
+      toast.error("Erro ao sair")
+    }finally{
+      setLoading(false)
     }
   }
 
@@ -669,6 +697,8 @@ function App() {
   }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
 
   useEffect(() => {
+    console.log(escolherEmpresa)
+    if (escolherEmpresa === '') return
     const loadTabela = async () => {
       try {
         setLoadingTabela(true);
@@ -684,7 +714,40 @@ function App() {
 
     loadTabela();
     getToken()
-  }, []);
+  }, [escolherEmpresa]);
+
+
+
+
+  if (escolherEmpresa === '') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md items-center justify-center flex flex-col">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Selecione a Empresa</h2>
+          <p className="text-gray-500 mb-8 text-center">Escolha qual sistema deseja acessar</p>
+          <div className="flex flex-col gap-4 w-full">
+            <button onClick={() => setEscolherEmpresa("NOVA")} className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Empresa 1
+            </button>
+            <button onClick={() => setEscolherEmpresa("INTERMEDIUM")} className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Intermedium
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
 
   if (loading || loadingTabela) {
@@ -699,6 +762,8 @@ function App() {
     );
   }
 
+
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
@@ -706,8 +771,10 @@ function App() {
           <div className="bg-white shadow-xl rounded-lg overflow-hidden">
             {escolhaCte ? (
               <div>
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-                  <h1 className="text-2xl font-bold text-white">CT-e EGS</h1>
+                <div className="flex justify-between items-center">
+                  <button onClick={() => setEscolhaCte(null)} className="bg-gray-200 px-4 py-2 rounded">Voltar</button>
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                  </div>
                 </div>
                 <div className="p-6">
                   <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
@@ -1226,7 +1293,10 @@ function App() {
             ) : (
               <div>
                 <div className="bg-white rounded-lg shadow-lg p-6">
-                  <h2 className="text-xl font-bold text-gray-800 mb-4">Selecione um CT-e</h2>
+                  <div className="flex flex-row justify-between">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Selecione um CT-e</h2>
+                    <button onClick={() => sair()} className="bg-gray-200 px-4 py-2 rounded">Sair</button>
+                  </div>
                   <div className="space-y-2 max-h-96 overflow-y-auto">
                     {ctes.length > 0 ? (
                       ctes.map((cte) => (
