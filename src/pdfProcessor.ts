@@ -541,25 +541,81 @@ export const extrairTAC = async (
   const { onProgress } = options || {};
 
   try {
-    onProgress?.('Iniciando OCR da imagem...');
+    // Verifica se é PDF
+    const isPdf = imageFile instanceof File && imageFile.type === 'application/pdf';
 
-    const result = await Tesseract.recognize(
-      imageFile,
-      'por',
-      {
-        logger: (m: any) => {
-          if (m.status === 'recognizing text') {
-            onProgress?.(
-              `Reconhecendo texto - ${Math.round(
-                m.progress * 100
-              )}%`
-            );
+    let texto = '';
+
+    if (isPdf) {
+      onProgress?.('Processando PDF...');
+
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        onProgress?.(`Processando página ${i}/${pdf.numPages}...`);
+
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.5 });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+          canvas,
+        }).promise;
+
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/png')
+        );
+
+        if (!blob) continue;
+
+        const result = await Tesseract.recognize(
+          blob,
+          'por',
+          {
+            logger: (m: any) => {
+              if (m.status === 'recognizing text') {
+                onProgress?.(
+                  `OCR página ${i}/${pdf.numPages} - ${Math.round(
+                    m.progress * 100
+                  )}%`
+                );
+              }
+            },
           }
-        },
-      }
-    );
+        );
 
-    const texto = result.data.text;
+        texto += result.data.text + '\n';
+      }
+    } else {
+      onProgress?.('Iniciando OCR da imagem...');
+
+      const result = await Tesseract.recognize(
+        imageFile,
+        'por',
+        {
+          logger: (m: any) => {
+            if (m.status === 'recognizing text') {
+              onProgress?.(
+                `Reconhecendo texto - ${Math.round(
+                  m.progress * 100
+                )}%`
+              );
+            }
+          },
+        }
+      );
+
+      texto = result.data.text;
+    }
+
     onProgress?.('Texto extraído com sucesso');
 
     // Procura por padrão de RNTRC/TAC (geralmente 9 dígitos)

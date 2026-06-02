@@ -1432,13 +1432,13 @@ function App() {
                             />
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.pdf"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
                                   setRntcImage(file);
                                   try {
-                                    toast.info('Processando imagem...');
+                                    toast.info('Processando documento...');
                                     const tac = await extrairTAC(file, {
                                       onProgress: (msg) => console.log(msg)
                                     });
@@ -1446,10 +1446,10 @@ function App() {
                                       setDadosCNH({ ...dadosCNH, rntc_proprietatio: tac });
                                       toast.success('RNTC extraído: ' + tac);
                                     } else {
-                                      toast.warning('Não foi possível extrair o RNTC da imagem');
+                                      toast.warning('Não foi possível extrair o RNTC');
                                     }
                                   } catch (error) {
-                                    toast.error('Erro ao processar imagem');
+                                    toast.error('Erro ao processar documento');
                                     console.error(error);
                                   }
                                 }
@@ -1574,13 +1574,13 @@ function App() {
                             />
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.pdf"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
                                   setRntcImageveiculo(file);
                                   try {
-                                    toast.info('Processando imagem...');
+                                    toast.info('Processando documento...');
                                     const tac = await extrairTAC(file, {
                                       onProgress: (msg) => console.log(msg)
                                     });
@@ -1588,10 +1588,10 @@ function App() {
                                       setDadosCNH({ ...dadosCNH, rntc: tac });
                                       toast.success('RNTC extraído: ' + tac);
                                     } else {
-                                      toast.warning('Não foi possível extrair o RNTC da imagem');
+                                      toast.warning('Não foi possível extrair o RNTC');
                                     }
                                   } catch (error) {
-                                    toast.error('Erro ao processar imagem');
+                                    toast.error('Erro ao processar documento');
                                     console.error(error);
                                   }
                                 }
