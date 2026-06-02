@@ -37,7 +37,7 @@ function App() {
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
   const [crlvFile, setCnhFile] = useState<File | null>(null)
-  const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
+  const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', tipoRodado: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: "" })
 
   const processarXML = (xmlContent: string) => {
     try {
@@ -186,7 +186,9 @@ function App() {
             tipoProprietario: '',
             tipoCarroceria: '',
             rntc: '',
-            tipoVeiculo: ''
+            tipoVeiculo: '',
+            rntc_proprietatio: '',
+            tipoRodado: ""
           });
 
           if (dados.cpf) {
@@ -424,6 +426,7 @@ function App() {
           localStorage.setItem('expires_id', tokenData.data.expires_in);
           localStorage.setItem('token', tokenData.data.access_token);
           localStorage.setItem('token_timestamp', Date.now().toString());
+          localStorage.setItem('company',escolherEmpresa)
           getCTES()
 
           setLoading(false);
@@ -635,6 +638,7 @@ function App() {
     }
 
     proprietário.RAZAOSOCIAL = dadosCNH.proprietario
+    proprietário.RNTC = dadosCNH.rntc_proprietatio
     proprietário.CPFCNPJ = dadosCNH.cpf.replace(/\D/g, '')
 
     try {
@@ -656,14 +660,15 @@ function App() {
 
   const sair = async () => {
     const currentToken = localStorage.getItem('token');
+    const company = localStorage.getItem('company')
     setLoading(true)
-    if(!currentToken){
+    if (!currentToken) {
       toast.info("CLique novamente")
       return
     }
     try {
       await axios.post(
-        `https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
+        `https://api.egssistemas.com.br/${company === "NOVA" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
         null,
         {
           headers: {
@@ -673,12 +678,12 @@ function App() {
         }
       );
       setEscolhaCte(null)
-      setDadosCNH({ tipoVeiculo: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '' })
+      setDadosCNH({ tipoVeiculo: '', tipoRodado: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: '' })
       setEscolherEmpresa("")
       localStorage.clear()
     } catch {
       toast.error("Erro ao sair")
-    }finally{
+    } finally {
       setLoading(false)
     }
   }
@@ -697,8 +702,10 @@ function App() {
   }, [quantidadeCarga, loadingTabela, destino.city, destino.uf])
 
   useEffect(() => {
-    console.log(escolherEmpresa)
-    if (escolherEmpresa === '') return
+    if (escolherEmpresa === '') {
+      sair()
+      return
+    }
     const loadTabela = async () => {
       try {
         setLoadingTabela(true);
@@ -1414,20 +1421,10 @@ function App() {
                           <label className="block text-sm font-medium text-gray-700 mb-1">RNTC do proprietário</label>
                           <input
                             type="text"
-                            value={proprietário.RNTC}
+                            value={dadosCNH.rntc_proprietatio}
                             onChange={(e) => {
-                              proprietário.RNTC = e.target.value
+                              setDadosCNH({ ...dadosCNH, rntc_proprietatio: e.target.value })
                             }}
-                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
-                        </div>
-                        <div className="h-4 border-b border-gray-300 w-full" />
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">CIDADE/UF</label>
-                          <input
-                            type="text"
-                            value={dadosCNH.local?.slice(-2) || ''}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, local: e.target.value })}
                             className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           />
                         </div>
@@ -1444,6 +1441,18 @@ function App() {
                             <option value="2">OUTROS</option>
                           </select>
                         </div>
+                        <div className="h-4 border-b border-gray-300 w-full" />
+                        <div className="h-4 border-b border-gray-300 w-full" />
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">CIDADE/UF</label>
+                          <input
+                            type="text"
+                            value={dadosCNH.local?.slice(-2) || ''}
+                            onChange={(e) => setDadosCNH({ ...dadosCNH, local: e.target.value })}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
+
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
                           <input
@@ -1490,6 +1499,25 @@ function App() {
                             <option>SELECIONAR</option>
                             <option value="R">REBOQUE</option>
                             <option value="T">TRAÇÃO</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE RODADO</label>
+                          <select
+                            value={dadosCNH.tipoRodado}
+                            onChange={(e) => {
+                              setDadosCNH({ ...dadosCNH, tipoRodado: e.target.value })
+                              veiculo.IDGRUPOVEICULO = e.target.value
+                            }}
+                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          >
+                            <option>SELECIONAR</option>
+                            <option value="01">TRUCK</option>
+                            <option value="02">TOCO</option>
+                            <option value="03">CAVALOR MECANICO</option>
+                            <option value="04">VAN</option>
+                            <option value="05">UTILITÁRIO</option>
+                            <option value="06">OUTROS</option>
                           </select>
                         </div>
 

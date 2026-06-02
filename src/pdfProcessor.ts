@@ -375,7 +375,7 @@ for (const linha of linhas) {
       }
     } else {
       //fallback
-      const proprietario = texto.split('CABINE ESTENDIDA')[1]?.trim().split('\n')[0];
+      const proprietario = texto.split('NãO APLICAVEL')[1]?.trim().split('\n')[0];
       if (proprietario) {
         dados.proprietario = proprietario;
       }
