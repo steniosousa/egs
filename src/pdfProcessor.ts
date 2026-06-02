@@ -525,3 +525,69 @@ const limparCampo = (valor: string) => {
     .replace(/\s+/g, ' ')
     .trim();
 };
+
+// =========================================================
+// EXTRAIR TAC/RNTRC DE IMAGEM
+// =========================================================
+
+export interface ExtrairTACOptions {
+  onProgress?: (message: string) => void;
+}
+
+export const extrairTAC = async (
+  imageFile: File | Blob,
+  options?: ExtrairTACOptions
+): Promise<string> => {
+  const { onProgress } = options || {};
+
+  try {
+    onProgress?.('Iniciando OCR da imagem...');
+
+    const result = await Tesseract.recognize(
+      imageFile,
+      'por',
+      {
+        logger: (m: any) => {
+          if (m.status === 'recognizing text') {
+            onProgress?.(
+              `Reconhecendo texto - ${Math.round(
+                m.progress * 100
+              )}%`
+            );
+          }
+        },
+      }
+    );
+
+    const texto = result.data.text;
+    onProgress?.('Texto extraído com sucesso');
+
+    // Procura por padrão de RNTRC/TAC (geralmente 9 dígitos)
+    // Pode aparecer com ou sem pontos/hífens
+    const tacMatch = texto.match(/\b\d{9}\b/);
+
+    if (tacMatch) {
+      const numeroSemZero = tacMatch[0].startsWith('0') ? tacMatch[0].slice(1) : tacMatch[0];
+      onProgress?.('TAC encontrado: ' + numeroSemZero);
+      return numeroSemZero;
+    }
+
+    // Tenta padrão alternativo com formatação (ex: 049.363.300)
+    const tacFormatadoMatch = texto.match(/\b\d{3}\.?\d{3}\.?\d{3}\b/);
+
+    if (tacFormatadoMatch) {
+      const numeroLimpo = tacFormatadoMatch[0].replace(/\./g, '');
+      onProgress?.('TAC encontrado: ' + numeroLimpo);
+      const numeroSemZero = numeroLimpo.startsWith('0') ? numeroLimpo.slice(1) : numeroLimpo;
+      return numeroSemZero.split('').slice(0, 9).join('');
+    }
+
+    onProgress?.('Nenhum número TAC encontrado');
+    return '';
+
+  } catch (error) {
+    console.error('Erro ao extrair TAC:', error);
+    onProgress?.('Erro ao extrair TAC');
+    throw error;
+  }
+};

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { carregarTabela, buscarValor19Ton, buscarValor27_30Ton, buscarValor14Ton, buscarValor32_35Ton, buscarValor38_40Ton, buscarValor50Ton } from "./tabelaMatrix";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { processarDocumento } from './pdfProcessor';
+import { processarDocumento, extrairTAC } from './pdfProcessor';
 import { proprietário, veiculo } from "./send";
 
 function App() {
@@ -37,6 +37,8 @@ function App() {
   const [sendObj, setSendObj] = useState<any>({})
   const [dadosBuscados, setDadosBuscados] = useState(false)
   const [crlvFile, setCnhFile] = useState<File | null>(null)
+  const [rntcImage, setRntcImage] = useState<File | null>(null)
+    const [rntcImageveiculo, setRntcImageveiculo] = useState<File | null>(null)
   const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', tipoRodado: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: "" })
 
   const processarXML = (xmlContent: string) => {
@@ -1419,14 +1421,52 @@ function App() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">RNTC do proprietário</label>
-                          <input
-                            type="text"
-                            value={dadosCNH.rntc_proprietatio}
-                            onChange={(e) => {
-                              setDadosCNH({ ...dadosCNH, rntc_proprietatio: e.target.value })
-                            }}
-                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={dadosCNH.rntc_proprietatio}
+                              onChange={(e) => {
+                                setDadosCNH({ ...dadosCNH, rntc_proprietatio: e.target.value })
+                              }}
+                              className="flex-1 block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setRntcImage(file);
+                                  try {
+                                    toast.info('Processando imagem...');
+                                    const tac = await extrairTAC(file, {
+                                      onProgress: (msg) => console.log(msg)
+                                    });
+                                    if (tac) {
+                                      setDadosCNH({ ...dadosCNH, rntc_proprietatio: tac });
+                                      toast.success('RNTC extraído: ' + tac);
+                                    } else {
+                                      toast.warning('Não foi possível extrair o RNTC da imagem');
+                                    }
+                                  } catch (error) {
+                                    toast.error('Erro ao processar imagem');
+                                    console.error(error);
+                                  }
+                                }
+                              }}
+                              className="hidden"
+                              id="rntc-image-upload-proprietario"
+                            />
+                            <label
+                              htmlFor="rntc-image-upload-proprietario"
+                              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 cursor-pointer flex items-center gap-2 transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span>Extrair</span>
+                            </label>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TIPO DE PROPRIETÁRIO</label>
@@ -1521,14 +1561,54 @@ function App() {
                           </select>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">RNTC</label>
-                          <input
-                            type="text"
-                            value={dadosCNH.rntc}
-                            onChange={(e) => setDadosCNH({ ...dadosCNH, rntc: e.target.value })}
-                            className="block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          />
+                         <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">RNTC do veiculo</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={dadosCNH.rntc}
+                              onChange={(e) => {
+                                setDadosCNH({ ...dadosCNH, rntc: e.target.value })
+                              }}
+                              className="flex-1 block w-full px-4 py-2 text-base border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setRntcImageveiculo(file);
+                                  try {
+                                    toast.info('Processando imagem...');
+                                    const tac = await extrairTAC(file, {
+                                      onProgress: (msg) => console.log(msg)
+                                    });
+                                    if (tac) {
+                                      setDadosCNH({ ...dadosCNH, rntc: tac });
+                                      toast.success('RNTC extraído: ' + tac);
+                                    } else {
+                                      toast.warning('Não foi possível extrair o RNTC da imagem');
+                                    }
+                                  } catch (error) {
+                                    toast.error('Erro ao processar imagem');
+                                    console.error(error);
+                                  }
+                                }
+                              }}
+                              className="hidden"
+                              id="rntc-image-upload"
+                            />
+                            <label
+                              htmlFor="rntc-image-upload"
+                              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 cursor-pointer flex items-center gap-2 transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span>Extrair</span>
+                            </label>
+                          </div>
                         </div>
 
                         <div>
