@@ -138,7 +138,7 @@ export const processarDocumento = async (
         await page.render({
           canvasContext: context,
           viewport,
-          canvas,
+          
         }).promise;
 
         const blob =
@@ -567,7 +567,7 @@ export const extrairTAC = async (
         await page.render({
           canvasContext: context,
           viewport,
-          canvas,
+          
         }).promise;
 
         const blob = await new Promise<Blob | null>((resolve) =>

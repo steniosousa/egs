@@ -38,7 +38,7 @@ function App() {
   const [dadosBuscados, setDadosBuscados] = useState(false)
   const [crlvFile, setCnhFile] = useState<File | null>(null)
   const [rntcImage, setRntcImage] = useState<File | null>(null)
-    const [rntcImageveiculo, setRntcImageveiculo] = useState<File | null>(null)
+  const [rntcImageveiculo, setRntcImageveiculo] = useState<File | null>(null)
   const [dadosCNH, setDadosCNH] = useState({ tipoVeiculo: '', tipoRodado: '', rntc: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: "" })
 
   const processarXML = (xmlContent: string) => {
@@ -96,9 +96,20 @@ function App() {
 
       if (vol) {
         const qVol = vol.querySelector("pesoB")?.textContent || "0";
-        setQuantidadeCarga(parseFloat(qVol));
-        sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(qVol);
-        sendObj.PESOKG = parseFloat(qVol);
+        const volumes = xmlDoc.querySelectorAll("vol");
+
+        const pesoTotal = Array.from(volumes).reduce((total, vol) => {
+          const peso = parseFloat(
+            vol.querySelector("pesoB")?.textContent || "0"
+          );
+
+          return total + peso;
+        }, 0);
+
+        console.log(pesoTotal); // 14000
+        setQuantidadeCarga(pesoTotal);
+        sendObj.CARGAQTD[0].QUANTIDADE = pesoTotal;
+        sendObj.PESOKG = pesoTotal;
       }
 
       const chNFe = xmlDoc.querySelector("chNFe")?.textContent || xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
@@ -273,7 +284,7 @@ function App() {
       }
 
       const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
-        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": cpfCnpjDestinatario,
           "id": null,
           "propertyList": []
@@ -283,7 +294,7 @@ function App() {
               'Authorization': 'Bearer ' + token,
             }
           }),
-        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": cpfCnpjRemetente,
           "id": null,
           "propertyList": []
@@ -293,7 +304,7 @@ function App() {
               'Authorization': 'Bearer ' + token,
             }
           }),
-        axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
+        axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
           params: {
             "search": placaVeiculoTração,
             "tipoVeiculo": "T"
@@ -302,7 +313,7 @@ function App() {
             'Authorization': 'Bearer ' + token,
           }
         }),
-        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+        axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
           "search": motorista,
           "id": null,
           "propertyList": []
@@ -313,48 +324,70 @@ function App() {
             }
           })
       ]);
-      sendObj.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
-      sendObj.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
-      sendObj.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
-      sendObj.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
-      sendObj.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
-      sendObj.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
-      sendObj.UFINISERV = destinatario.data[0].CODESTADO;
-      sendObj.IDREMETENTE = Remetente.data[0].IDCADASTRO
-      sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
-      sendObj.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
-      sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
       sendObj.DESCCARGA = produtoPredominante;
       sendObj.TIPOCARGA = produtoPredominante;
-      sendObj.Veiculos[0] = {
-        ...sendObj.Veiculos[0],
-        IDENT: VeiculoTração.data[0].IDENT,
-        RENAVAN: VeiculoTração.data[0].RENAVAN,
-        PLACA: VeiculoTração.data[0].PLACA,
-        TARA: VeiculoTração.data[0].TARA,
-        CAPACIDADEKG: VeiculoTração.data[0].CAPACIDADEKG,
-        CAPACIDADEM3: VeiculoTração.data[0].CAPACIDADEM3,
-        PROPRIO: VeiculoTração.data[0].PROPRIO,
-        TIPOVEICULO: VeiculoTração.data[0].TIPOVEICULO,
-        TIPORODADO: VeiculoTração.data[0].TIPORODADO,
-        TIPOCARROCERIA: VeiculoTração.data[0].TIPOCARROCERIA,
-        UFLICENCIADO: VeiculoTração.data[0].UFLICENCIADO,
-        CPFCNPJ: VeiculoTração.data[0].CPFCNPJ,
-        RNTC: VeiculoTração.data[0].RNTC,
-        NOMEPROPRIETARIO: VeiculoTração.data[0].NOMEPROPRIETARIO,
-        INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
-        UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
-        TIPOPROPRIETARIO: VeiculoTração.data[0].TIPOPROPRIETARIO,
-        IDVEICULO: VeiculoTração.data[0].IDVEICULO
+
+      if (Remetente.data[0]) {
+        setRemetenteNome(Remetente.data[0].NOME)
+        sendObj.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
+        sendObj.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
+        sendObj.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
+        sendObj.IDREMETENTE = Remetente.data[0].IDCADASTRO
+      } else {
+        toast.info("Remetente não encontrado")
       }
-      sendObj.IDVEICULO = VeiculoTração.data[0].IDVEICULO
+
+      if (destinatario.data[0]) {
+        setDestinatarioNome(destinatario.data[0].NOME)
+        sendObj.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
+        sendObj.UFINISERV = destinatario.data[0].CODESTADO;
+        sendObj.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
+        sendObj.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
+        sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
+        sendObj.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
+
+      } else {
+        toast.info("Destinatpario não encontrado")
+      }
+      if (VeiculoTração.data[0]) {
+        sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
+        sendObj.Veiculos[0] = {
+          ...sendObj.Veiculos[0],
+          IDENT: VeiculoTração.data[0].IDENT,
+          RENAVAN: VeiculoTração.data[0].RENAVAN,
+          PLACA: VeiculoTração.data[0].PLACA,
+          TARA: VeiculoTração.data[0].TARA,
+          CAPACIDADEKG: VeiculoTração.data[0].CAPACIDADEKG,
+          CAPACIDADEM3: VeiculoTração.data[0].CAPACIDADEM3,
+          PROPRIO: VeiculoTração.data[0].PROPRIO,
+          TIPOVEICULO: VeiculoTração.data[0].TIPOVEICULO,
+          TIPORODADO: VeiculoTração.data[0].TIPORODADO,
+          TIPOCARROCERIA: VeiculoTração.data[0].TIPOCARROCERIA,
+          UFLICENCIADO: VeiculoTração.data[0].UFLICENCIADO,
+          CPFCNPJ: VeiculoTração.data[0].CPFCNPJ,
+          RNTC: VeiculoTração.data[0].RNTC,
+          NOMEPROPRIETARIO: VeiculoTração.data[0].NOMEPROPRIETARIO,
+          INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
+          UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
+          TIPOPROPRIETARIO: VeiculoTração.data[0].TIPOPROPRIETARIO,
+          IDVEICULO: VeiculoTração.data[0].IDVEICULO
+        }
+        sendObj.IDVEICULO = VeiculoTração.data[0].IDVEICULO
+        setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
+      } else {
+        toast.info("Veículo não encontrado")
+      }
+
+      if (Motorista.data[0]) {
+        sendObj.IDMOTORISTA = Motorista.data[0].IDCADASTRO
+        setMotoristaNome(Motorista.data[0].NOME)
+      } else {
+        toast.info("Motorista não encontrado")
+      }
+
+
       sendObj.DOCNFE[0].CHAVENFE = chaveNotaFiscal
       sendObj.DOCNFE[0].NNF = numeroNotaFiscal
-      sendObj.IDMOTORISTA = Motorista.data[0].IDCADASTRO
-      setMotoristaNome(Motorista.data[0].NOME)
-      setDestinatarioNome(destinatario.data[0].NOME)
-      setRemetenteNome(Remetente.data[0].NOME)
-      setVeiculoNome(VeiculoTração.data[0].DESCRICAO)
       setDadosBuscados(true)
     }
     catch (error) {
@@ -375,7 +408,7 @@ function App() {
         return
       }
 
-      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
+      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
         headers: {
           'Authorization': 'Bearer ' + token,
           'Content-Type': 'application/json'
@@ -407,7 +440,7 @@ function App() {
         }
       }
 
-      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get(`https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=${escolherEmpresa === "NOVA" ? "2570123" : "50201"}&EGSERP=true`);
+      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get(`https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=${escolherEmpresa === "GADELOG" ? "2570123" : "50201"}&EGSERP=true`);
       setTimeout(async () => {
         try {
 
@@ -416,19 +449,19 @@ function App() {
           params.append('captcha', '');
           params.append('codigo2fa', '');
           params.append('grant_type', 'password');
-          params.append('username', escolherEmpresa === "NOVA" ? "HENRIQUE" : 'FINANCEIRO');
-          params.append('password', escolherEmpresa === "NOVA" ? "291546" : 'inter2026');
+          params.append('username', escolherEmpresa === "GADELOG" ? "HENRIQUE" : 'FINANCEIRO');
+          params.append('password', escolherEmpresa === "GADELOG" ? "291546" : 'inter2026');
 
-          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
+          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
             headers: {
-              authorization: escolherEmpresa === "NOVA" ? "Basic MjU3MDEyMzplZyR5c3RlbQ==" : 'Basic NTAyMDE6ZWckeXN0ZW0='
+              authorization: escolherEmpresa === "GADELOG" ? "Basic MjU3MDEyMzplZyR5c3RlbQ==" : 'Basic NTAyMDE6ZWckeXN0ZW0='
             }
           });
 
           localStorage.setItem('expires_id', tokenData.data.expires_in);
           localStorage.setItem('token', tokenData.data.access_token);
           localStorage.setItem('token_timestamp', Date.now().toString());
-          localStorage.setItem('company',escolherEmpresa)
+          localStorage.setItem('company', escolherEmpresa)
           getCTES()
 
           setLoading(false);
@@ -445,7 +478,7 @@ function App() {
 
   const getCTES = async () => {
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -524,7 +557,7 @@ function App() {
 
   const buscarCteEscolhida = async () => {
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${escolhaCte}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${escolhaCte}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -545,7 +578,7 @@ function App() {
       return
     }
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/Gcadastro`, {
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gcadastro`, {
         params: {
           $filter: `(contains(tolower(CPFCNPJ), '${cpf}')) and (STATUS ne 'C')`,
           $count: true,
@@ -577,7 +610,7 @@ function App() {
         toast.error("Informe a placa do veículo")
         return
       }
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//odata/Gveiculo`, {
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gveiculo`, {
         params: {
           $filter: `(contains(tolower(PLACA), '${placa}')) and (STATUS ne 'C')`,
           $count: true,
@@ -619,7 +652,7 @@ function App() {
     }
 
     try {
-      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
+      await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
         veiculo,
         {
           headers: {
@@ -644,7 +677,7 @@ function App() {
     proprietário.CPFCNPJ = dadosCNH.cpf.replace(/\D/g, '')
 
     try {
-      const { data } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "NOVA" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
+      const { data } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
         proprietário,
         {
           headers: {
@@ -670,7 +703,7 @@ function App() {
     }
     try {
       await axios.post(
-        `https://api.egssistemas.com.br/${company === "NOVA" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
+        `https://api.egssistemas.com.br/${company === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
         null,
         {
           headers: {
@@ -740,11 +773,11 @@ function App() {
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Selecione a Empresa</h2>
           <p className="text-gray-500 mb-8 text-center">Escolha qual sistema deseja acessar</p>
           <div className="flex flex-col gap-4 w-full">
-            <button onClick={() => setEscolherEmpresa("NOVA")} className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3">
+            <button onClick={() => setEscolherEmpresa("GADELOG")} className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
-              Empresa 1
+              Gadelog
             </button>
             <button onClick={() => setEscolherEmpresa("INTERMEDIUM")} className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-6 py-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-3">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1561,7 +1594,7 @@ function App() {
                           </select>
                         </div>
 
-                         <div>
+                        <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">RNTC do veiculo</label>
                           <div className="flex gap-2">
                             <input
