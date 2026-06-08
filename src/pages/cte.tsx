@@ -1,0 +1,41 @@
+export default function CTE({ctes, setEscolhaCte}: {ctes: any[], setEscolhaCte: (cte: string) => void}) {
+    return (
+        <div>
+            <div className="bg-white rounded-lg shadow-lg p-6">
+                <div className="flex flex-row justify-between">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">Selecione um CT-e</h2>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {ctes.length > 0 ? (
+                        ctes.map((cte) => (
+                            <div
+                                key={cte.IDCTE}
+                                onClick={() => setEscolhaCte(cte.IDCTE)}
+                                className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition duration-200 border border-gray-200 hover:border-blue-300"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-gray-800">CT-e: {cte.IDCTE}</p>
+                                        <p className="text-sm text-gray-600">Remetente: {cte.REM_NOME}</p>
+                                        <p className="text-sm text-gray-600">Origem: {cte.NOMECIDADEEMISSAO}</p>
+                                        <p className="text-sm text-gray-600">Destino: {cte.NOMECIDADEFIMSERV}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-500">
+                                            {new Date(cte.DATACREATE).toLocaleDateString('pt-BR')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8">
+                            <p className="text-gray-500">Nenhum CT-e encontrado</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+        </div>
+    )
+}

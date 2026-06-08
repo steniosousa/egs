@@ -6,7 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // =========================================================
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  '/pdf.worker.min.mjs';
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // =========================================================
 // TYPES
@@ -550,7 +550,9 @@ export const extrairTAC = async (
       onProgress?.('Processando PDF...');
 
       const arrayBuffer = await imageFile.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({
+        data: arrayBuffer,
+      }).promise;
 
       for (let i = 1; i <= pdf.numPages; i++) {
         onProgress?.(`Processando página ${i}/${pdf.numPages}...`);
@@ -574,6 +576,10 @@ export const extrairTAC = async (
           canvas.toBlob(resolve, 'image/png')
         );
 
+        // Limpa o canvas e remove do DOM
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.remove();
+
         if (!blob) continue;
 
         const result = await Tesseract.recognize(
@@ -594,6 +600,9 @@ export const extrairTAC = async (
 
         texto += result.data.text + '\n';
       }
+
+      // Destroi o documento PDF para liberar recursos
+      await pdf.destroy();
     } else {
       onProgress?.('Iniciando OCR da imagem...');
 
