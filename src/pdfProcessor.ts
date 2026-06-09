@@ -420,7 +420,7 @@ for (const linha of linhas) {
 // CNH
 // =========================================================
 
-const extrairCNH = (
+export const extrairCNH = (
   texto: string
 ): DadosDocumento => {
   const dados: DadosDocumento = {
@@ -517,12 +517,6 @@ const limparTexto = (texto: string) => {
       /Documento emitido por CDT.*/gi,
       ''
     )
-    .trim();
-};
-
-const limparCampo = (valor: string) => {
-  return valor
-    .replace(/\s+/g, ' ')
     .trim();
 };
 

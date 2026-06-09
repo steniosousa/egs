@@ -2,13 +2,14 @@ import axios from "axios";
 import { proprietário, veiculo } from "../send";
 import { toast } from "react-toastify";
 import { formatarCpfCnpj } from "../utils/format";
-import { extrairTAC, processarDocumento } from "../pdfProcessor";
+import { extrairCNH, extrairTAC, processarDocumento } from "../pdfProcessor";
 import { useState } from "react";
-import { CRLV } from "../types/types";
+import { useApp } from "../context/AppContext";
 
-export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: { dadosCRLV: CRLV, escolherEmpresa: string, setDadosCRLV: (dados: CRLV) => void }) {
-    const [crlvFile, setCrlvFile] = useState<File | null>(null)
+export default function CRLVView() {
+    const { empresa, dadosXML, setDadosXML, dadosCRLV, setDadosCRLV, } = useApp();
     const [loading, setLoading] = useState(false)
+
     const handleCRLVUpload = (
         event: React.ChangeEvent<HTMLInputElement>
     ) => {
@@ -22,7 +23,6 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
                 },
 
                 onSuccess: (dados) => {
-                    setCrlvFile(file)
                     setDadosCRLV({
                         proprietario: dados.proprietario || '',
                         local: dados.local || '',
@@ -40,8 +40,13 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
                         rntc_veículo: '',
                         tipoVeiculo: '',
                         rntc_proprietatio: '',
-                        tipoRodado: ""
+                        tipoRodado: "",
+                        nome_motorista: "",
+                        cpf_motorista: '',
+                        rntc_motorista: ''
                     });
+
+                    setDadosXML({ ...dadosXML, placaVeiculoTração: dados.placa });
 
                     if (dados.cpf) {
                         formatarCpfCnpj(
@@ -73,22 +78,24 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
     };
 
     const verificarSeProprietarioTaCadastrado = async () => {
-        const cpf = dadosCRLV.cpf;
-
-        if (!cpf) {
+        if (!dadosCRLV || !dadosCRLV.cpf) {
             toast.error("INFORME O CPF DO PROPRIETÁRIO")
             return
         }
+
+        console.log(empresa)
+        const cpf = dadosCRLV.cpf;
+
         setLoading(true)
         try {
-            const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gcadastro`, {
+            const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gcadastro`, {
                 params: {
                     $filter: `(contains(tolower(CPFCNPJ), '${cpf}')) and (STATUS ne 'C')`,
                     $count: true,
                     $top: 20
                 },
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                    Authorization: `Bearer ${empresa.token}`
                 }
             })
 
@@ -110,6 +117,11 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
     }
     const verificarSeVeiculoTaCadastrado = async () => {
         try {
+            if (!dadosCRLV || !dadosCRLV.placa) {
+                toast.error("INFORME A PLACA DO VEÍCULO")
+                return
+            }
+
             const placa = dadosCRLV.placa;
 
             if (!placa) {
@@ -117,14 +129,14 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
                 return
             }
             setLoading(true)
-            const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gveiculo`, {
+            const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/Gveiculo`, {
                 params: {
                     $filter: `(contains(tolower(PLACA), '${placa}')) and (STATUS ne 'C')`,
                     $count: true,
                     $top: 20
                 },
                 headers: {
-                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                    Authorization: `Bearer ${empresa.token}`
                 }
             })
 
@@ -144,6 +156,10 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
     }
 
     const criarVeiculo = async () => {
+        if (!dadosCRLV) {
+            toast.error("INFORME A PLACA DO VEÍCULO")
+            return
+        }
         veiculo.PLACA = dadosCRLV.placa
         veiculo.CAPACIDADEKG = parseInt(dadosCRLV.capacidade)
         veiculo.TARA = parseInt(dadosCRLV.peso)
@@ -161,11 +177,11 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
         }
 
         try {
-            await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
+            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
                 veiculo,
                 {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                        Authorization: `Bearer ${empresa.token}`
                     }
                 }
             )
@@ -176,6 +192,10 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
     }
 
     const criarProprietario = async () => {
+        if (!dadosCRLV) {
+            toast.error("CRLV não encontrado")
+            return
+        }
         if (!dadosCRLV.cpf || !dadosCRLV.proprietario || !dadosCRLV.rntc_proprietatio) {
             toast.error("INFORME O CPF, O NOME DO PROPRIETÁRIO, O RNTC")
             return
@@ -186,11 +206,11 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
         proprietário.CPFCNPJ = dadosCRLV.cpf.replace(/\D/g, '')
 
         try {
-            const { data } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
+            const { data } = await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
                 proprietário,
                 {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem('token')}`
+                        Authorization: `Bearer ${empresa.token}`
                     }
                 }
             )
@@ -223,8 +243,8 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
 
     return (
         <div className="w-full">
-            {crlvFile ? (
-                <div className="grid xl:grid-cols-2 gap-8">
+            {dadosCRLV ? (
+                <div className="grid xl:grid-cols-3 gap-8">
 
                     {/* PROPRIETÁRIO */}
                     <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
@@ -432,6 +452,252 @@ export default function CRLVView({ dadosCRLV, escolherEmpresa, setDadosCRLV }: {
                                     "Processar"
                                 )}
                             </button>
+                        </div>
+                    </div>
+                    {/* MOTORISTA */}
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center">
+                                👤
+                            </div>
+
+                            <div>
+                                <h3 className="font-semibold text-slate-800">
+                                    Motorista
+                                </h3>
+
+                                <p className="text-sm text-slate-500">
+                                    Dados do motorista do veículo
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-5">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    CPF
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={dadosCRLV.cpf_motorista}
+                                    onChange={(e) => {
+                                        setDadosCRLV({ ...dadosCRLV, cpf_motorista: e.target.value });
+                                    }}
+                                    className={fieldClass}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    Nome
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={dadosCRLV.nome_motorista}
+                                    onChange={(e) => {
+                                        setDadosCRLV({
+                                            ...dadosCRLV,
+                                            nome_motorista: e.target.value,
+                                        });
+                                        proprietário.RAZAOSOCIAL = e.target.value;
+                                    }}
+                                    className={fieldClass}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    RNTC do Motorista
+                                </label>
+
+                                <div className="flex items-center gap-2">
+
+                                    <input
+                                        type="text"
+                                        value={dadosCRLV.rntc_motorista}
+                                        onChange={(e) =>
+                                            setDadosCRLV({
+                                                ...dadosCRLV,
+                                                rntc_motorista: e.target.value,
+                                            })
+                                        }
+                                        className={`${fieldClass} flex-1`}
+                                        placeholder="RNTC do motorista"
+                                    />
+
+                                    <input
+                                        id="rntc-image-upload-motorista"
+                                        type="file"
+                                        accept="image/*,.pdf"
+                                        className="hidden"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+
+                                            if (!file) return;
+
+                                            try {
+                                                toast.info("Processando documento...");
+
+                                                const tac = await extrairTAC(file);
+
+                                                if (tac) {
+                                                    setDadosCRLV({
+                                                        ...dadosCRLV,
+                                                        rntc_motorista: tac,
+                                                    });
+
+                                                    toast.success(`RNTC extraído: ${tac}`);
+                                                } else {
+                                                    toast.warning("Não foi possível extrair o RNTC");
+                                                }
+                                            } catch (error) {
+                                                toast.error("Erro ao processar documento");
+                                            }
+                                        }}
+                                    />
+
+                                    <label
+                                        htmlFor="rntc-image-upload-motorista"
+                                        className="
+                                            h-12
+                                            px-5
+                                            shrink-0
+                                            bg-blue-600
+                                            hover:bg-blue-700
+                                            text-white
+                                            rounded-xl
+                                            flex
+                                            items-center
+                                            cursor-pointer
+                                            transition-colors
+                                            "
+                                    >
+                                        Extrair
+                                    </label>
+
+                                </div>
+                            </div>
+
+                        </div>
+                        <div className="w-full flex justify-center mt-10">
+                            <button
+                                type="button"
+                                onClick={verificarSeProprietarioTaCadastrado}
+                                disabled={loading}
+                                className="
+                                    h-12
+                                    px-6
+                                    bg-blue-600
+                                    hover:bg-blue-700
+                                    disabled:bg-blue-400
+                                    disabled:cursor-not-allowed
+                                    text-white
+                                    font-semibold
+                                    rounded-xl
+                                    shadow-sm
+                                    transition-all
+                                    flex
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                "
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg
+                                            className="w-5 h-5 animate-spin"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                                opacity="0.25"
+                                            />
+                                            <path
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                            />
+                                        </svg>
+
+                                        Processando...
+                                    </>
+                                ) : (
+                                    "Processar"
+                                )}
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+
+                            <input
+                                type="text"
+                                value={dadosCRLV.rntc_motorista}
+                                onChange={(e) =>
+                                    setDadosCRLV({
+                                        ...dadosCRLV,
+                                        rntc_motorista: e.target.value,
+                                    })
+                                }
+                                className={`${fieldClass} flex-1`}
+                                placeholder="CNH do motorista"
+                            />
+
+                            <input
+                                id="cnh-image-upload-motorista"
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+
+                                    if (!file) return;
+
+                                    try {
+                                        toast.info("Processando documento...");
+
+                                        const cnh = extrairCNH(file);
+
+                                        if (cnh) {
+                                            setDadosCRLV({
+                                                ...dadosCRLV,
+                                                rntc_motorista: cnh.cnh,
+                                            });
+
+                                            toast.success(`RNTC extraído: ${tac}`);
+                                        } else {
+                                            toast.warning("Não foi possível extrair o RNTC");
+                                        }
+                                    } catch (error) {
+                                        toast.error("Erro ao processar documento");
+                                    }
+                                }}
+                            />
+
+                            <label
+                                htmlFor="cnh-image-upload-motorista"
+                                className="
+                                            h-12
+                                            px-5
+                                            shrink-0
+                                            bg-blue-600
+                                            hover:bg-blue-700
+                                            text-white
+                                            rounded-xl
+                                            flex
+                                            items-center
+                                            cursor-pointer
+                                            transition-colors
+                                            "
+                            >
+                                Extrair
+                            </label>
+
                         </div>
                     </div>
                     {/* VEÍCULO */}

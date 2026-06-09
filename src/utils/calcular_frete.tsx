@@ -1,63 +1,66 @@
-export default function calcularFrete(saida: { city: string, uf: string }, destino: { city: string, uf: string }, quantidadeCarga: number) {
-    const cargaEmKg = quantidadeCarga / 1000
+import { toast } from "react-toastify";
+import { buscarValor14Ton, buscarValor19Ton, buscarValor27_30Ton, buscarValor32_35Ton, buscarValor38_40Ton, buscarValor50Ton } from "../tabelaMatrix";
 
-    let valorTabela = 0;
-    let tipoCaminhao = '50';
+export default function calcularFrete(saida: { city: string, uf: string }, destino: { city: string, uf: string }, quantidadeCarga: number): { valorDoServiço: number } | void {
+  const cargaEmKg = quantidadeCarga / 1000
+
+  let valorTabela = 0;
+  let tipoCaminhao = '50';
 
 
-    if (quantidadeCarga >= 13980 && quantidadeCarga < 19000) {
-      tipoCaminhao = '14';
-    } else if (quantidadeCarga >= 19000 && quantidadeCarga < 27000) {
-      tipoCaminhao = '19';
-    } else if (quantidadeCarga >= 27000 && quantidadeCarga < 31980) {
-      tipoCaminhao = '27_30';
-    } else if (quantidadeCarga >= 31980 && quantidadeCarga < 38000) {
-      tipoCaminhao = '32_35';
-    } else if (quantidadeCarga >= 38000 && quantidadeCarga < 50000) {
-      tipoCaminhao = '38_40';
-    }
-
-    // switch (tipoCaminhao) {
-    //   case '14':
-    //     valorTabela = buscarValor14Ton(destino.city, destino.uf);
-    //     break;
-    //   case '19':
-    //     valorTabela = buscarValor19Ton(destino.city, destino.uf);
-    //     break;
-    //   case '27_30':
-    //     valorTabela = buscarValor27_30Ton(destino.city, destino.uf);
-    //     break;
-    //   case '32_35':
-    //     valorTabela = buscarValor32_35Ton(destino.city, destino.uf);
-    //     break;
-    //   case '38_40':
-    //     valorTabela = buscarValor38_40Ton(destino.city, destino.uf);
-    //     break;
-    //   case '50':
-    //     valorTabela = buscarValor50Ton(destino.city, destino.uf);
-    //     break;
-    //   default:
-    //     valorTabela = buscarValor14Ton(destino.city, destino.uf);
-    // }
-
-    // if (!valorTabela || valorTabela === 0) {
-    //   toast.error(`Valor do frete não encontrado para ${destino.city}/${destino.uf} com caminhão de ${tipoCaminhao} toneladas`)
-    //   return
-    // }
-
-    // const valorDoServiço = valorTabela * cargaEmKg
-    // const valorDoServicoComLocalString = valorDoServiço.toLocaleString('pt-br')
-
-    // setValorServico(valorDoServicoComLocalString)
-    // setValorICMS((valorDoServiço * 0.12).toFixed(2))
-    // setPercentualCBS((valorDoServiço * 0.009).toFixed(2))
-    // setValorIBS((valorDoServiço * 0.001).toFixed(2))
-    // sendObj.VALORSERVICO = valorDoServiço;
-    // sendObj.VALORRECEBER = valorDoServiço;
-    // sendObj.ICMS_VALORICMS = parseFloat((valorDoServiço * 0.12).toFixed(2));
-    // sendObj.ICMS_VALORBC = valorDoServiço;
-    // sendObj.IBSCBS.vBC = Number(valorDoServiço.toFixed(2));
-    // sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
-    // sendObj.IBSCBS.vIBSUF = parseFloat((valorDoServiço * 0.001).toFixed(2));
-    // sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
+  if (quantidadeCarga >= 13980 && quantidadeCarga < 19000) {
+    tipoCaminhao = '14';
+  } else if (quantidadeCarga >= 19000 && quantidadeCarga < 27000) {
+    tipoCaminhao = '19';
+  } else if (quantidadeCarga >= 27000 && quantidadeCarga < 31980) {
+    tipoCaminhao = '27_30';
+  } else if (quantidadeCarga >= 31980 && quantidadeCarga < 38000) {
+    tipoCaminhao = '32_35';
+  } else if (quantidadeCarga >= 38000 && quantidadeCarga < 50000) {
+    tipoCaminhao = '38_40';
   }
+
+  switch (tipoCaminhao) {
+    case '14':
+      valorTabela = buscarValor14Ton(destino.city, destino.uf);
+      break;
+    case '19':
+      valorTabela = buscarValor19Ton(destino.city, destino.uf);
+      break;
+    case '27_30':
+      valorTabela = buscarValor27_30Ton(destino.city, destino.uf);
+      break;
+    case '32_35':
+      valorTabela = buscarValor32_35Ton(destino.city, destino.uf);
+      break;
+    case '38_40':
+      valorTabela = buscarValor38_40Ton(destino.city, destino.uf);
+      break;
+    case '50':
+      valorTabela = buscarValor50Ton(destino.city, destino.uf);
+      break;
+    default:
+      valorTabela = buscarValor14Ton(destino.city, destino.uf);
+  }
+
+  if (!valorTabela || valorTabela === 0) {
+    toast.error(`Valor do frete não encontrado para ${destino.city}/${destino.uf} com caminhão de ${tipoCaminhao} toneladas`)
+    return
+  }
+
+  // const valorDoServiço = valorTabela * cargaEmKg
+
+  // sendObj.VALORSERVICO = valorDoServiço;
+  // sendObj.VALORRECEBER = valorDoServiço;
+  // sendObj.ICMS_VALORICMS = parseFloat((valorDoServiço * 0.12).toFixed(2));
+  // sendObj.ICMS_VALORBC = valorDoServiço;
+  // sendObj.IBSCBS.vBC = Number(valorDoServiço.toFixed(2));
+  // sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
+  // sendObj.IBSCBS.vIBSUF = parseFloat((valorDoServiço * 0.001).toFixed(2));
+  // sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
+
+
+  return {
+    valorDoServiço: Number((valorTabela * cargaEmKg).toFixed(2)),
+  }
+}

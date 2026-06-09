@@ -1,4 +1,4 @@
-export default function CTE({ctes, setEscolhaCte}: {ctes: any[], setEscolhaCte: (cte: string) => void}) {
+export default function CTEView({ctes, buscarCteEscolhida}: {ctes: any[], buscarCteEscolhida: (cte: string) => void}) {
     return (
         <div>
             <div className="bg-white rounded-lg shadow-lg p-6">
@@ -10,7 +10,7 @@ export default function CTE({ctes, setEscolhaCte}: {ctes: any[], setEscolhaCte: 
                         ctes.map((cte) => (
                             <div
                                 key={cte.IDCTE}
-                                onClick={() => setEscolhaCte(cte.IDCTE)}
+                                onClick={() => buscarCteEscolhida(String(cte.IDCTE))}
                                 className="bg-gray-50 hover:bg-gray-100 p-4 rounded-lg cursor-pointer transition duration-200 border border-gray-200 hover:border-blue-300"
                             >
                                 <div className="flex justify-between items-center">

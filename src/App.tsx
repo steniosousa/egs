@@ -3,99 +3,23 @@ import { useEffect, useState } from "react";
 import { carregarTabela } from "./tabelaMatrix";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { CRLV, XML } from "./types/types";
 import CRLVView from "./pages/crlv";
+import { AppProvider, useApp } from "./context/AppContext";
+import CTEView from "./pages/cte";
+import CRIAR from "./pages/criar";
 
-function App() {
-  const [escolherEmpresa, setEscolherEmpresa] = useState('')
+function AppContent() {
+  const { empresa, dadosCRLV, setDadosCRLV, limparDados, getToken, cteSelecionado, setCteSelecionado } = useApp();
   const token = localStorage.getItem('token');
-  const [loading, setLoading] = useState<boolean>(() => !token);
-  const [loadingTabela, setLoadingTabela] = useState<boolean>(true)
-  const [escolhaCte, setEscolhaCte] = useState<number | null>(null)
+  const [tab, setTab] = useState<'crlv' | 'xml'>('crlv');
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
-  const [dadosCRLV, setDadosCRLV] = useState<CRLV>({ tipoVeiculo: '', tipoRodado: '', rntc_veículo: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: "" })
-  const [dadosXML, setDadosXML] = useState<XML>({
-    cpf_motorista: '',
-    cpfCnpjDestinatario: '',
-    cpfCnpjRemetente: '',
-    quantidadeCarga: '0',
-    valorCarga: '0',
-    valorServico: '0',
-    produtoPredominante: '',
-    placaVeiculoTração: '',
-    nome_motorista: '',
-    nome_veiculo: '',
-    nome_remetente: '',
-    nome_destinatario: '',
-    numeroNotaFiscal: '',
-    chaveNotaFiscal: '',
-    percentualCBS: '',
-    valorIBS: '',
-    valorICMS: '0',
-    saida: { city: '', uf: '' },
-    destino: { city: '', uf: '' }
-  })
-
-  const getToken = async () => {
-    try {
-      const currentToken = localStorage.getItem('token');
-      const expiresId = localStorage.getItem('expires_id');
-      const tokenTimestamp = localStorage.getItem('token_timestamp');
-
-      if (currentToken && expiresId && tokenTimestamp) {
-        const currentTime = Date.now();
-        const tokenTime = parseInt(tokenTimestamp);
-        const expiresIn = parseInt(expiresId) * 1000;
-
-        if (currentTime - tokenTime < (expiresIn - 300000)) {
-          setLoading(false);
-          getCTES()
-          return;
-        }
-      }
-
-      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get(`https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=${escolherEmpresa === "GADELOG" ? "2570123" : "50201"}&EGSERP=true`);
-      setTimeout(async () => {
-        try {
-
-          const params = new URLSearchParams();
-          params.append('auxtoken', data.AUXTOKEN);
-          params.append('captcha', '');
-          params.append('codigo2fa', '');
-          params.append('grant_type', 'password');
-          params.append('username', escolherEmpresa === "GADELOG" ? "HENRIQUE" : 'FINANCEIRO');
-          params.append('password', escolherEmpresa === "GADELOG" ? "291546" : 'inter2026');
-
-          const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
-            headers: {
-              authorization: escolherEmpresa === "GADELOG" ? "Basic MjU3MDEyMzplZyR5c3RlbQ==" : 'Basic NTAyMDE6ZWckeXN0ZW0='
-            }
-          });
-
-          localStorage.setItem('expires_id', tokenData.data.expires_in);
-          localStorage.setItem('token', tokenData.data.access_token);
-          localStorage.setItem('token_timestamp', Date.now().toString());
-          localStorage.setItem('company', escolherEmpresa)
-          getCTES()
-
-          setLoading(false);
-        } catch (error: any) {
-          toast.error(error.response.data.error_description || "Erro ao obter token")
-          setLoading(false)
-        }
-      }, 1000);
-    } catch (error) {
-      toast.error("Erro ao obter token")
-      setLoading(false);
-    }
-  }
 
   const getCTES = async () => {
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
+            Authorization: `Bearer ${empresa.token}`
           }
         }
       )
@@ -105,71 +29,51 @@ function App() {
     }
   }
 
-  const buscarCteEscolhida = async () => {
+  const buscarCteEscolhida = async (id: string) => {
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${escolhaCte}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
+      const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${id}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`
+            Authorization: `Bearer ${empresa.token}`
           }
         }
       )
-      // setSendObj(data)
+      setCteSelecionado(data)
     } catch (e) {
       toast.error("Erro ao recuperar a nota escolhida")
     }
   }
 
   const sair = async () => {
-    const currentToken = localStorage.getItem('token');
-    const company = localStorage.getItem('company')
-    setLoading(true)
-
-    if (!company) {
+    if (!empresa) {
       return
     }
-    if (!currentToken) {
+    if (!token) {
       return
     }
     try {
       await axios.post(
-        `https://api.egssistemas.com.br/${company === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
+        `https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
         null,
         {
           headers: {
-            Authorization: `Bearer ${currentToken}`
+            Authorization: `Bearer ${empresa.token}`
           },
           withCredentials: true
         }
       );
-      limparXML()
+      limparDados()
       localStorage.clear()
     } catch {
       toast.error("Erro ao sair")
-    } finally {
-      setLoading(false)
     }
   }
 
-  const limparXML = () => {
-    setDadosCRLV({ tipoVeiculo: '', tipoRodado: '', rntc_veículo: '', tipoCarroceria: "", tipoProprietario: '', proprietario: '', local: '', cpf: '', categoria: '', validade: '', renavam: '', placa: '', carroceria: '', modelo: '', capacidade: '', peso: '', rntc_proprietatio: '' })
-  }
-
   useEffect(() => {
-    if (!escolhaCte || escolhaCte === 0) {
-      return
+    if (empresa.name) {
+      getCTES()
     }
-    buscarCteEscolhida()
-  }, [escolhaCte])
-
-
-  useEffect(() => {
-    if (escolherEmpresa === '') {
-      sair()
-      return
-    }
-    getToken()
-  }, [escolherEmpresa]);
+  }, [empresa])
 
   useEffect(() => {
     const loadTabela = async () => {
@@ -180,26 +84,13 @@ function App() {
   }, []);
 
 
-
-  if (!loading && !loadingTabela) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-lg">
-          <p className="mt-4 text-gray-600">
-            {loading ? 'Carregando aplicação...' : 'Carregando tabela de fretes...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex w-full max-w-lg bg-white p-1.5 rounded-2xl shadow-lg border border-gray-200">
           <button
-            onClick={() => setEscolherEmpresa("GADELOG")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${escolherEmpresa === "GADELOG"
+            onClick={async () => await getToken("GADELOG")}
+            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa.name === "GADELOG"
               ? "bg-blue-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
               }`}
@@ -221,8 +112,8 @@ function App() {
           </button>
 
           <button
-            onClick={() => setEscolherEmpresa("INTERMEDIUM")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${escolherEmpresa === "INTERMEDIUM"
+            onClick={async () => await getToken("INTERMEDIUM")}
+            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa.name === "INTERMEDIUM"
               ? "bg-emerald-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
               }`}
@@ -243,7 +134,27 @@ function App() {
             Intermedium
           </button>
         </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab('crlv')}
+            className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'crlv'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            CRLV
+          </button>
 
+          <button
+            onClick={() => setTab('xml')}
+            className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'xml'
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            XML
+          </button>
+        </div>
         <button
           onClick={sair}
           className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
@@ -254,10 +165,20 @@ function App() {
 
       <div className="max-w-3x4 mx-auto">
         <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
-          <CRLVView dadosCRLV={dadosCRLV} escolherEmpresa={escolherEmpresa} setDadosCRLV={setDadosCRLV} />
+          {tab === 'crlv' && <CRLVView />}
+          {/* {tab === 'xml' && !cteSelecionado && <CTEView ctes={ctes} buscarCteEscolhida={buscarCteEscolhida} />} */}
+          {tab === 'xml'  && <CRIAR />}
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }
 

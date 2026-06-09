@@ -3,43 +3,68 @@ import { toast } from "react-toastify";
 import { formatarCpfCnpj } from "../utils/format";
 import { useState } from "react";
 import { sendObj } from "../send";
+import { useApp } from "../context/AppContext";
 import { XML } from "../types/types";
+import calcularFrete from "../utils/calcular_frete";
 
-export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }: { setDadosXML: (dados: XML) => void, dadosXML: XML, escolherEmpresa: string, token: string }) {
+export default function CRIAR() {
+    const { empresa, dadosXML, setDadosXML } = useApp();
     const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
 
 
+    const formatarValor = (valor: string) => {
+        return Number(valor).toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    };
+
+
     const processarXML = (xmlContent: string) => {
+        // if (!cteSelecionado) {
+        //     toast.error('Sem CTE selecionado');
+        //     return;
+        // }
+
+
         try {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
 
-            const dest = xmlDoc.querySelector("dest");
-            if (dest) {
-                const cpfCnpjDest = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
-                if (cpfCnpjDest) {
-                    formatarCpfCnpj(cpfCnpjDest, 'destinatario');
-                }
-            }
 
-            const emit = xmlDoc.querySelector("emit");
-            if (emit) {
-                const cpfCnpjRem = emit.querySelector("CPF")?.textContent || emit.querySelector("CNPJ")?.textContent || "";
-                if (cpfCnpjRem) {
-                    formatarCpfCnpj(cpfCnpjRem, 'Remetente');
-                }
-            }
 
             const icmsTot = xmlDoc.querySelector("ICMSTot");
             const vol = xmlDoc.querySelector("vol");
             const ide = xmlDoc.querySelector("ide");
             const exit = xmlDoc.querySelector("enderEmit");
+            const dest = xmlDoc.querySelector("dest");
             const destination = xmlDoc.querySelector("enderDest");
+            const emit = xmlDoc.querySelector("emit");
+
+            const atualizacoes: Partial<XML> = {};
+
+
+            if (dest) {
+                const cpfCnpjDest = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
+                if (cpfCnpjDest) {
+                    const cpf = formatarCpfCnpj(cpfCnpjDest, 'destinatario');
+                    atualizacoes.cpfCnpjDestinatario = cpf;
+                }
+            }
+
+            if (emit) {
+                const cpfCnpjRem = emit.querySelector("CPF")?.textContent || emit.querySelector("CNPJ")?.textContent || "";
+                if (cpfCnpjRem) {
+                    const cpf = formatarCpfCnpj(cpfCnpjRem, 'Remetente');
+                    atualizacoes.cpfCnpjRemetente = cpf;
+                }
+            }
+
             if (ide) {
                 const nNF = ide.querySelector("nNF")?.textContent || "";
                 const chave = xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
-                setDadosXML({ ...dadosXML, numeroNotaFiscal: nNF });
-                setDadosXML({ ...dadosXML, chaveNotaFiscal: chave });
+                atualizacoes.numeroNotaFiscal = nNF;
+                atualizacoes.chaveNotaFiscal = chave;
             }
 
             let produto = "";
@@ -48,19 +73,14 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
             }
 
             if (produto) {
-                setDadosXML({ ...dadosXML, produtoPredominante: produto });
+                atualizacoes.produtoPredominante = produto;
             }
 
-            let totalValor = '0';
             if (icmsTot) {
                 const vNF = icmsTot.querySelector("vNF")?.textContent || "0";
-                totalValor = vNF
+                atualizacoes.valorCarga = formatarValor(vNF);
             }
-            if (totalValor !== '0') {
-                const valueWithToFixed = parseInt(totalValor).toFixed(2)
-                setDadosXML({ ...dadosXML, valorCarga: valueWithToFixed });
-                sendObj.VALORCARGA = Number(valueWithToFixed);
-            }
+
 
             if (vol) {
                 const volumes = xmlDoc.querySelectorAll("vol");
@@ -73,29 +93,8 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
                     return total + peso;
                 }, 0);
 
-                setDadosXML({ ...dadosXML, quantidadeCarga: pesoTotal.toString() });
-                sendObj.CARGAQTD[0].QUANTIDADE = pesoTotal;
-                sendObj.PESOKG = pesoTotal;
+                atualizacoes.quantidadeCarga = pesoTotal.toString();
             }
-
-            const chNFe = xmlDoc.querySelector("chNFe")?.textContent || xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
-            if (chNFe) {
-                sendObj.DOCNFE = [{
-                    IDENT: 0,
-                    IDCTE: 0,
-                    CHAVENFE: chNFe,
-                    VALORNFE: null,
-                    PESOB: null,
-                    PESOL: null,
-                    PIN: null,
-                    DATAPREVENTREGA: null,
-                    PITEM: 0,
-                    NNF: xmlDoc.querySelector("nNF")?.textContent || "",
-                    NCM: null,
-                    DESCPRODUTO: null
-                }];
-            }
-
 
             const saidaCidade = exit?.querySelector("xMun")?.textContent || "";
             const saidaUF = exit?.querySelector("UF")?.textContent || "";
@@ -103,23 +102,36 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
             const destinoUF = destination?.querySelector("UF")?.textContent || "";
 
             if (saidaCidade && destinoCidade && saidaUF && destinoUF) {
-                setDadosXML({
-                    ...dadosXML,
-                    saida: {
-                        city: saidaCidade,
-                        uf: saidaUF
-                    },
-                    destino: {
-                        city: destinoCidade,
-                        uf: destinoUF
-                    }
-                })
+                const serviço = calcularFrete({
+                    city: saidaCidade,
+                    uf: saidaUF
+                }, {
+                    city: destinoCidade,
+                    uf: destinoUF
+                }, Number(atualizacoes.quantidadeCarga))
+                console.log(serviço)
+                if (!serviço) {
+                    toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
+                    return
+                }
+                atualizacoes.valorServico = serviço.valorDoServiço
+                atualizacoes.saida = {
+                    city: saidaCidade,
+                    uf: saidaUF
+                };
+                atualizacoes.destino = {
+                    city: destinoCidade,
+                    uf: destinoUF
+                };
             }
 
+            setDadosXML({ ...dadosXML, ...atualizacoes });
 
         } catch (error) {
             toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
         }
+
+
     };
 
 
@@ -139,6 +151,8 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
 
     const loadingData = async () => {
         try {
+            console.log(dadosXML, new Date().getTime());
+            return;
 
             if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
                 toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
@@ -146,48 +160,50 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
             }
 
             const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
-                axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
                     "search": dadosXML.cpfCnpjDestinatario,
                     "id": null,
                     "propertyList": []
                 },
                     {
                         headers: {
-                            'Authorization': 'Bearer ' + token,
+                            'Authorization': 'Bearer ' + empresa.token,
                         }
                     }),
-                axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
                     "search": dadosXML.cpfCnpjRemetente,
                     "id": null,
                     "propertyList": []
                 },
                     {
                         headers: {
-                            'Authorization': 'Bearer ' + token,
+                            'Authorization': 'Bearer ' + empresa.token,
                         }
                     }),
-                axios.get(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
+                axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
                     params: {
                         "search": dadosXML.placaVeiculoTração,
                         "tipoVeiculo": "T"
                     },
                     headers: {
-                        'Authorization': 'Bearer ' + token,
+                        'Authorization': 'Bearer ' + empresa.token,
                     }
                 }),
-                axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
+                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
                     "search": dadosXML.cpf_motorista,
                     "id": null,
                     "propertyList": []
                 },
                     {
                         headers: {
-                            'Authorization': 'Bearer ' + token,
+                            'Authorization': 'Bearer ' + empresa.token,
                         }
                     })
             ]);
             sendObj.DESCCARGA = dadosXML.produtoPredominante;
             sendObj.TIPOCARGA = dadosXML.produtoPredominante;
+            sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(dadosXML.quantidadeCarga);
+            sendObj.PESOKG = parseFloat(dadosXML.quantidadeCarga);
 
             if (Remetente.data[0]) {
                 setDadosXML({ ...dadosXML, nome_remetente: Remetente.data[0].NOME })
@@ -265,7 +281,7 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
             }
 
 
-            await axios.post(`https://api.egssistemas.com.br/${escolherEmpresa === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
+            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
                 headers: {
                     'Authorization': 'Bearer ' + token,
                     'Content-Type': 'application/json'
@@ -279,22 +295,15 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
         }
     };
 
-
     return (
         <div>
             <div className="p-6">
                 <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
                     <div className="text-center">
-                        <div className="mb-4">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-2">Importar XML</h3>
-                            <p className="text-sm text-gray-600 mb-4">Carregue um arquivo XML para preencher automaticamente os dados</p>
-                        </div>
-
                         <div className="border-t border-gray-200 pt-4">
                             <label htmlFor="xml-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
 
                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-
                                     <p className="mb-2 text-sm text-gray-600">
                                         <span className="font-semibold text-blue-600">Clique para selecionar</span> ou arraste o arquivo XML aqui
                                     </p>
@@ -455,7 +464,7 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
                                     </label>
                                     <input
                                         type="text"
-                                        value={dadosXML.valorCarga}
+                                        value={`R$ ${dadosXML.valorCarga}`}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                             setDadosXML({ ...dadosXML, valorCarga: e.target.value });
                                         }}
@@ -497,7 +506,7 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
                                         value={dadosXML.valorServico}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                             const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, valorServico: e.target.value });
+                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
                                             sendObj.VALORSERVICO = parseFloat(value) || 0;
                                             sendObj.VALORRECEBER = parseFloat(value) || 0;
                                         }}
@@ -664,7 +673,7 @@ export default function CRIAR({ setDadosXML, dadosXML, escolherEmpresa, token }:
                                         value={dadosXML.valorServico}
                                         onChange={(e) => {
                                             const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, valorServico: e.target.value });
+                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
                                             sendObj.IBSCBS.vBC = parseFloat(value) || 0;
                                         }}
                                         id="valorBC"
