@@ -9,7 +9,7 @@ import CTEView from "./pages/cte";
 import CRIAR from "./pages/criar";
 
 function AppContent() {
-  const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading } = useApp();
+  const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading, setLoading,dadosCRLV } = useApp();
   const token = localStorage.getItem('token');
   const [tab, setTab] = useState<'crlv' | 'xml'>('crlv');
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
@@ -19,6 +19,7 @@ function AppContent() {
       toast.error("Empresa não selecionada")
       return
     }
+
     try {
       const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
         {
@@ -81,14 +82,27 @@ function AppContent() {
   }
 
   useEffect(() => {
-    if (empresa && empresa.name) {
+   console.log(dadosCRLV)
+  }, [dadosCRLV])
+
+  useEffect(() => {
+    if (empresa && empresa.name && tab === 'xml') {
       getCTES()
     }
-  }, [empresa])
+  }, [empresa, tab])
 
   useEffect(() => {
     const loadTabela = async () => {
-      await carregarTabela();
+      setLoading(true)
+      try {
+        await carregarTabela();
+
+      } catch (e) {
+        toast.error("Erro ao carregar tabela")
+      } finally {
+        setLoading(false)
+      }
+
     };
 
     loadTabela();
@@ -145,10 +159,12 @@ function AppContent() {
             Intermedium
           </button>
         </div>
-        {loading && <div className="flex items-center justify-center flex-col">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p>Carregando...</p>
-        </div>}
+        {loading &&
+          <div className="flex items-center justify-center flex-col">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p>Carregando...</p>
+          </div>
+        }
         <div className="flex gap-2">
           <button
             onClick={() => setTab('crlv')}
@@ -161,6 +177,7 @@ function AppContent() {
           </button>
 
           <button
+            disabled={dadosCRLV == null}
             onClick={() => setTab('xml')}
             className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'xml'
               ? 'bg-blue-600 text-white shadow-lg'

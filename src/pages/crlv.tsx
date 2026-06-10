@@ -359,214 +359,6 @@ export default function CRLVView() {
             {dadosCRLV ? (
                 <div className="grid xl:grid-cols-3 gap-8">
 
-                    {/* PROPRIETÁRIO */}
-                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
-
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center">
-                                👤
-                            </div>
-
-                            <div>
-                                <h3 className="font-semibold text-slate-800">
-                                    Proprietário
-                                </h3>
-
-                                <p className="text-sm text-slate-500">
-                                    Dados do proprietário do veículo
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-5">
-
-                            {/* CPF/CNPJ */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    CPF/CNPJ do proprietario
-                                </label>
-
-                                <input
-                                    type="text"
-                                    value={dadosCRLV.cpf_proprietario}
-                                    onChange={(e) => {
-                                        setDadosCRLV({ ...dadosCRLV, cpf_proprietario: e.target.value });
-                                        proprietário.CPFCNPJ = e.target.value;
-                                    }}
-                                    className={fieldClass}
-                                />
-                            </div>
-
-                            {/* Proprietário */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    Proprietário
-                                </label>
-
-                                <input
-                                    type="text"
-                                    value={dadosCRLV.proprietario}
-                                    onChange={(e) => {
-                                        setDadosCRLV({
-                                            ...dadosCRLV,
-                                            proprietario: e.target.value,
-                                        });
-                                        proprietário.RAZAOSOCIAL = e.target.value;
-                                    }}
-                                    className={fieldClass}
-                                />
-                            </div>
-
-                            {/* RNTC Proprietário */}
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    RNTC do Proprietário
-                                </label>
-
-                                <div className="flex items-center gap-2">
-
-                                    <input
-                                        type="text"
-                                        value={dadosCRLV.rntc_proprietatio}
-                                        onChange={(e) =>
-                                            setDadosCRLV({
-                                                ...dadosCRLV,
-                                                rntc_proprietatio: e.target.value,
-                                            })
-                                        }
-                                        className={`${fieldClass} flex-1`}
-                                        placeholder="RNTC do proprietário"
-                                    />
-
-                                    <input
-                                        id="rntc-image-upload-proprietario"
-                                        type="file"
-                                        accept="image/*,.pdf"
-                                        className="hidden"
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-
-                                            if (!file) return;
-
-                                            try {
-                                                toast.info("Processando documento...");
-
-                                                const tac = await extrairTAC(file);
-
-                                                if (tac) {
-                                                    setDadosCRLV({
-                                                        ...dadosCRLV,
-                                                        rntc_proprietatio: tac,
-                                                    });
-
-                                                    toast.success(`RNTC extraído: ${tac}`);
-                                                } else {
-                                                    toast.warning("Não foi possível extrair o RNTC");
-                                                }
-                                            } catch (error) {
-                                                toast.error("Erro ao processar documento");
-                                            }
-                                        }}
-                                    />
-
-                                    <label
-                                        htmlFor="rntc-image-upload-proprietario"
-                                        className="
-                                            h-12
-                                            px-5
-                                            shrink-0
-                                            bg-blue-600
-                                            hover:bg-blue-700
-                                            text-white
-                                            rounded-xl
-                                            flex
-                                            items-center
-                                            cursor-pointer
-                                            transition-colors
-                                            "
-                                    >
-                                        Extrair
-                                    </label>
-
-                                </div>
-                            </div>
-
-                            {/* Tipo Proprietário */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    Tipo de Proprietário
-                                </label>
-
-                                <select
-                                    value={dadosCRLV.tipoProprietario}
-                                    onChange={(e) =>
-                                        setDadosCRLV({
-                                            ...dadosCRLV,
-                                            tipoProprietario: e.target.value,
-                                        })
-                                    }
-                                    className={fieldClass}
-                                >
-                                    <option>SELECIONAR</option>
-                                    <option value="0">TAC-AGREGADO</option>
-                                    <option value="1">TAC-INDEPENDENTE</option>
-                                    <option value="2">OUTROS</option>
-                                </select>
-                            </div>
-
-                        </div>
-                        <div className="w-full flex justify-center mt-10">
-                            <button
-                                type="button"
-                                onClick={verificarSeProprietarioTaCadastrado}
-                                disabled={loading}
-                                className="
-                                    h-12
-                                    px-6
-                                    bg-blue-600
-                                    hover:bg-blue-700
-                                    disabled:bg-blue-400
-                                    disabled:cursor-not-allowed
-                                    text-white
-                                    font-semibold
-                                    rounded-xl
-                                    shadow-sm
-                                    transition-all
-                                    flex
-                                    items-center
-                                    justify-center
-                                    gap-2
-                                "
-                            >
-                                {loading ? (
-                                    <>
-                                        <svg
-                                            className="w-5 h-5 animate-spin"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <circle
-                                                cx="12"
-                                                cy="12"
-                                                r="10"
-                                                stroke="currentColor"
-                                                strokeWidth="4"
-                                                opacity="0.25"
-                                            />
-                                            <path
-                                                fill="currentColor"
-                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                            />
-                                        </svg>
-
-                                        Processando...
-                                    </>
-                                ) : (
-                                    "Processar"
-                                )}
-                            </button>
-                        </div>
-                    </div>
                     {/* MOTORISTA */}
                     <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
 
@@ -635,7 +427,7 @@ export default function CRLVView() {
                                             transition-colors
                                             "
                                 >
-                                    Extrair
+                                    CNH
                                 </label>
                             </div>
                         </div>
@@ -997,6 +789,29 @@ export default function CRLVView() {
                                 />
                             </div>
 
+                            {/* Tipo Proprietário */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    Tipo de Proprietário
+                                </label>
+
+                                <select
+                                    value={dadosCRLV.tipoProprietario}
+                                    onChange={(e) =>
+                                        setDadosCRLV({
+                                            ...dadosCRLV,
+                                            tipoProprietario: e.target.value,
+                                        })
+                                    }
+                                    className={fieldClass}
+                                >
+                                    <option>SELECIONAR</option>
+                                    <option value="0">TAC-AGREGADO</option>
+                                    <option value="1">TAC-INDEPENDENTE</option>
+                                    <option value="2">OUTROS</option>
+                                </select>
+                            </div>
+
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-slate-600 mb-2">
                                     RNTC do Veículo
@@ -1043,7 +858,6 @@ export default function CRLVView() {
                                                     toast.warning("Não foi possível extrair o RNTC");
                                                 }
                                             } catch (error) {
-                                                console.error(error);
                                                 toast.error("Erro ao processar documento");
                                             }
                                         }}
@@ -1077,6 +891,194 @@ export default function CRLVView() {
                             <button
                                 type="button"
                                 onClick={verificarSeVeiculoTaCadastrado}
+                                disabled={loading}
+                                className="
+                                    h-12
+                                    px-6
+                                    bg-blue-600
+                                    hover:bg-blue-700
+                                    disabled:bg-blue-400
+                                    disabled:cursor-not-allowed
+                                    text-white
+                                    font-semibold
+                                    rounded-xl
+                                    shadow-sm
+                                    transition-all
+                                    flex
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                "
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg
+                                            className="w-5 h-5 animate-spin"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <circle
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                                opacity="0.25"
+                                            />
+                                            <path
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                            />
+                                        </svg>
+
+                                        Processando...
+                                    </>
+                                ) : (
+                                    "Processar"
+                                )}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* PROPRIETÁRIO */}
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
+
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center">
+                                👤
+                            </div>
+
+                            <div>
+                                <h3 className="font-semibold text-slate-800">
+                                    Proprietário
+                                </h3>
+
+                                <p className="text-sm text-slate-500">
+                                    Dados do proprietário do veículo
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-5">
+
+                            {/* CPF/CNPJ */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    CPF/CNPJ do proprietario
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={dadosCRLV.cpf_proprietario}
+                                    onChange={(e) => {
+                                        setDadosCRLV({ ...dadosCRLV, cpf_proprietario: e.target.value });
+                                        proprietário.CPFCNPJ = e.target.value;
+                                    }}
+                                    className={fieldClass}
+                                />
+                            </div>
+
+                            {/* Proprietário */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    Proprietário
+                                </label>
+
+                                <input
+                                    type="text"
+                                    value={dadosCRLV.proprietario}
+                                    onChange={(e) => {
+                                        setDadosCRLV({
+                                            ...dadosCRLV,
+                                            proprietario: e.target.value,
+                                        });
+                                        proprietário.RAZAOSOCIAL = e.target.value;
+                                    }}
+                                    className={fieldClass}
+                                />
+                            </div>
+
+                            {/* RNTC Proprietário */}
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-600 mb-2">
+                                    RNTC do Proprietário
+                                </label>
+
+                                <div className="flex items-center gap-2">
+
+                                    <input
+                                        type="text"
+                                        value={dadosCRLV.rntc_proprietatio}
+                                        onChange={(e) =>
+                                            setDadosCRLV({
+                                                ...dadosCRLV,
+                                                rntc_proprietatio: e.target.value,
+                                            })
+                                        }
+                                        className={`${fieldClass} flex-1`}
+                                        placeholder="RNTC do proprietário"
+                                    />
+
+                                    <input
+                                        id="rntc-image-upload-proprietario"
+                                        type="file"
+                                        accept="image/*,.pdf"
+                                        className="hidden"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+
+                                            if (!file) return;
+
+                                            try {
+                                                toast.info("Processando documento...");
+
+                                                const tac = await extrairTAC(file);
+
+                                                if (tac) {
+                                                    setDadosCRLV({
+                                                        ...dadosCRLV,
+                                                        rntc_proprietatio: tac,
+                                                    });
+
+                                                    toast.success(`RNTC extraído: ${tac}`);
+                                                } else {
+                                                    toast.warning("Não foi possível extrair o RNTC");
+                                                }
+                                            } catch (error) {
+                                                toast.error("Erro ao processar documento");
+                                            }
+                                        }}
+                                    />
+
+                                    <label
+                                        htmlFor="rntc-image-upload-proprietario"
+                                        className="
+                                            h-12
+                                            px-5
+                                            shrink-0
+                                            bg-blue-600
+                                            hover:bg-blue-700
+                                            text-white
+                                            rounded-xl
+                                            flex
+                                            items-center
+                                            cursor-pointer
+                                            transition-colors
+                                            "
+                                    >
+                                        Extrair
+                                    </label>
+
+                                </div>
+                            </div>
+
+
+
+                        </div>
+                        <div className="w-full flex justify-center mt-10">
+                            <button
+                                type="button"
+                                onClick={verificarSeProprietarioTaCadastrado}
                                 disabled={loading}
                                 className="
                                     h-12

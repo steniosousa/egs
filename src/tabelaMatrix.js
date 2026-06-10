@@ -4,7 +4,6 @@ let tabelaData = null;
 
 export const carregarTabela = async () => {
   try {
-    console.log('Tentando carregar tabela de fretes...');
     const response = await fetch('/TABELA MATRIZ.xlsx');
     
     if (!response.ok) {
@@ -29,10 +28,8 @@ export const carregarTabela = async () => {
     });
     
     tabelaData = data;
-    console.log(`Tabela carregada com sucesso: ${data.length} registros`);
     return data;
   } catch (error) {
-    console.error('Erro ao carregar tabela:', error);
     throw error;
   }
 };
@@ -64,7 +61,6 @@ export const buscarValor50Ton = (cidade, uf) => {
 // Função para buscar usando os nomes das colunas (se tiver cabeçalho)
 export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
   if (!tabelaData) {
-    console.warn('Tabela não carregada. Execute carregarTabela() primeiro.');
     return null;
   }
   
@@ -77,12 +73,10 @@ export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
   });
   
   if (linhaEncontrada) {
-    // Retornar o valor da coluna especificada (tipo de caminhão)
     const valor = linhaEncontrada[tipoCaminhao] || 0;
     return valor;
   }
   
-  console.warn(`Cidade/UF não encontrada na tabela: ${cidade}/${uf} para tipo de caminhão: ${tipoCaminhao}`);
   return null;
 };
 

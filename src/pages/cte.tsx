@@ -1,4 +1,4 @@
-export default function CTEView({ctes, buscarCteEscolhida}: {ctes: any[], buscarCteEscolhida: (cte: string) => void}) {
+export default function CTEView({ ctes, buscarCteEscolhida }: { ctes: any[], buscarCteEscolhida: (cte: string) => void }) {
     return (
         <div>
             <div className="bg-white rounded-lg shadow-lg p-6">
@@ -30,7 +30,10 @@ export default function CTEView({ctes, buscarCteEscolhida}: {ctes: any[], buscar
                         ))
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-gray-500">Nenhum CT-e encontrado</p>
+                            <div className="flex items-center justify-center flex-col">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                <p>Carregando...</p>
+                            </div>
                         </div>
                     )}
                 </div>
