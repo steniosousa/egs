@@ -9,12 +9,16 @@ import CTEView from "./pages/cte";
 import CRIAR from "./pages/criar";
 
 function AppContent() {
-  const { empresa, dadosCRLV, setDadosCRLV, limparDados, getToken, cteSelecionado, setCteSelecionado } = useApp();
+  const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading } = useApp();
   const token = localStorage.getItem('token');
   const [tab, setTab] = useState<'crlv' | 'xml'>('crlv');
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
 
   const getCTES = async () => {
+    if (!empresa) {
+      toast.error("Empresa não selecionada")
+      return
+    }
     try {
       const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
         {
@@ -30,6 +34,10 @@ function AppContent() {
   }
 
   const buscarCteEscolhida = async (id: string) => {
+    if (!empresa) {
+      toast.error("Empresa não selecionada")
+      return
+    }
     try {
       const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${id}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
         {
@@ -38,6 +46,8 @@ function AppContent() {
           }
         }
       )
+
+      console.log(data)
       setCteSelecionado(data)
     } catch (e) {
       toast.error("Erro ao recuperar a nota escolhida")
@@ -46,6 +56,7 @@ function AppContent() {
 
   const sair = async () => {
     if (!empresa) {
+      toast.error("Empresa não selecionada")
       return
     }
     if (!token) {
@@ -70,7 +81,7 @@ function AppContent() {
   }
 
   useEffect(() => {
-    if (empresa.name) {
+    if (empresa && empresa.name) {
       getCTES()
     }
   }, [empresa])
@@ -90,7 +101,7 @@ function AppContent() {
         <div className="flex w-full max-w-lg bg-white p-1.5 rounded-2xl shadow-lg border border-gray-200">
           <button
             onClick={async () => await getToken("GADELOG")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa.name === "GADELOG"
+            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa && empresa.name === "GADELOG"
               ? "bg-blue-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
               }`}
@@ -113,7 +124,7 @@ function AppContent() {
 
           <button
             onClick={async () => await getToken("INTERMEDIUM")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa.name === "INTERMEDIUM"
+            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa && empresa.name === "INTERMEDIUM"
               ? "bg-emerald-600 text-white shadow-md"
               : "text-gray-600 hover:bg-gray-100"
               }`}
@@ -134,6 +145,10 @@ function AppContent() {
             Intermedium
           </button>
         </div>
+        {loading && <div className="flex items-center justify-center flex-col">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p>Carregando...</p>
+        </div>}
         <div className="flex gap-2">
           <button
             onClick={() => setTab('crlv')}
@@ -166,8 +181,8 @@ function AppContent() {
       <div className="max-w-3x4 mx-auto">
         <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
           {tab === 'crlv' && <CRLVView />}
-          {/* {tab === 'xml' && !cteSelecionado && <CTEView ctes={ctes} buscarCteEscolhida={buscarCteEscolhida} />} */}
-          {tab === 'xml'  && <CRIAR />}
+          {tab === 'xml' && !cteSelecionado && <CTEView ctes={ctes} buscarCteEscolhida={buscarCteEscolhida} />}
+          {tab === 'xml' && cteSelecionado && <CRIAR />}
         </div>
       </div>
     </div>

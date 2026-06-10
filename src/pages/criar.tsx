@@ -2,15 +2,13 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { formatarCpfCnpj } from "../utils/format";
 import { useState } from "react";
-import { sendObj } from "../send";
 import { useApp } from "../context/AppContext";
-import { XML } from "../types/types";
+import { CTE, XML } from "../types/types";
 import calcularFrete from "../utils/calcular_frete";
 
 export default function CRIAR() {
-    const { empresa, dadosXML, setDadosXML } = useApp();
+    const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
     const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
-
 
     const formatarValor = (valor: string) => {
         return Number(valor).toLocaleString('pt-BR', {
@@ -25,6 +23,7 @@ export default function CRIAR() {
         //     toast.error('Sem CTE selecionado');
         //     return;
         // }
+
 
 
         try {
@@ -78,7 +77,8 @@ export default function CRIAR() {
 
             if (icmsTot) {
                 const vNF = icmsTot.querySelector("vNF")?.textContent || "0";
-                atualizacoes.valorCarga = formatarValor(vNF);
+                atualizacoes.valorCarga = vNF;
+
             }
 
 
@@ -109,12 +109,15 @@ export default function CRIAR() {
                     city: destinoCidade,
                     uf: destinoUF
                 }, Number(atualizacoes.quantidadeCarga))
-                console.log(serviço)
                 if (!serviço) {
                     toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
                     return
                 }
+
                 atualizacoes.valorServico = serviço.valorDoServiço
+                atualizacoes.valorIBS = (serviço.valorDoServiço * 0.001).toFixed(2).toString()
+                atualizacoes.percentualCBS = (serviço.valorDoServiço * 0.009).toFixed(2).toString()
+                atualizacoes.valorICMS = (serviço.valorDoServiço * 0.12).toFixed(2).toString()
                 atualizacoes.saida = {
                     city: saidaCidade,
                     uf: saidaUF
@@ -150,9 +153,17 @@ export default function CRIAR() {
     };
 
     const loadingData = async () => {
+
+
+
+
         try {
-            console.log(dadosXML, new Date().getTime());
-            return;
+            if (!empresa) {
+                toast.error("Empresa não encontrada")
+                return
+            }
+
+            const atualizacoes: Partial<CTE> = { ...cteSelecionado };
 
             if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
                 toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
@@ -200,37 +211,32 @@ export default function CRIAR() {
                         }
                     })
             ]);
-            sendObj.DESCCARGA = dadosXML.produtoPredominante;
-            sendObj.TIPOCARGA = dadosXML.produtoPredominante;
-            sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(dadosXML.quantidadeCarga);
-            sendObj.PESOKG = parseFloat(dadosXML.quantidadeCarga);
+
 
             if (Remetente.data[0]) {
+                atualizacoes.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
+                atualizacoes.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
+                atualizacoes.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
+                atualizacoes.IDREMETENTE = Remetente.data[0].IDCADASTRO
                 setDadosXML({ ...dadosXML, nome_remetente: Remetente.data[0].NOME })
-                sendObj.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
-                sendObj.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
-                sendObj.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
-                sendObj.IDREMETENTE = Remetente.data[0].IDCADASTRO
             } else {
                 toast.info("Remetente não encontrado")
             }
 
             if (destinatario.data[0]) {
+                atualizacoes.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
+                atualizacoes.UFINISERV = destinatario.data[0].CODESTADO;
+                atualizacoes.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
+                atualizacoes.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
+                atualizacoes.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
+                atualizacoes.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
                 setDadosXML({ ...dadosXML, nome_destinatario: destinatario.data[0].NOME })
-                sendObj.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
-                sendObj.UFINISERV = destinatario.data[0].CODESTADO;
-                sendObj.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
-                sendObj.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
-                sendObj.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
-                sendObj.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
-
             } else {
                 toast.info("Destinatpario não encontrado")
             }
-            if (VeiculoTração.data[0]) {
-                sendObj.CARGAQTD[0].DESCMEDIDA = VeiculoTração.data[0].DESCRICAO;
-                sendObj.Veiculos[0] = {
-                    ...sendObj.Veiculos[0],
+            if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
+                atualizacoes.Veiculos[0] = {
+                    ...atualizacoes.Veiculos?.[0],
                     IDENT: VeiculoTração.data[0].IDENT,
                     RENAVAN: VeiculoTração.data[0].RENAVAN,
                     PLACA: VeiculoTração.data[0].PLACA,
@@ -248,24 +254,57 @@ export default function CRIAR() {
                     INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
                     UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
                     TIPOPROPRIETARIO: VeiculoTração.data[0].TIPOPROPRIETARIO,
-                    IDVEICULO: VeiculoTração.data[0].IDVEICULO
+                    IDVEICULO: VeiculoTração.data[0].IDVEICULO,
                 }
-                sendObj.IDVEICULO = VeiculoTração.data[0].IDVEICULO
+                atualizacoes.IDVEICULO = VeiculoTração.data[0].IDVEICULO
                 setDadosXML({ ...dadosXML, nome_veiculo: VeiculoTração.data[0].DESCRICAO })
             } else {
                 toast.info("Veículo não encontrado")
             }
 
             if (Motorista.data[0]) {
-                sendObj.IDMOTORISTA = Motorista.data[0].IDCADASTRO
+                atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
                 setDadosXML({ ...dadosXML, nome_motorista: Motorista.data[0].NOME })
             } else {
                 toast.info("Motorista não encontrado")
             }
 
+            if (atualizacoes.DOCNFE && atualizacoes.DOCNFE[0]) {
+                atualizacoes.DOCNFE[0].CHAVENFE = dadosXML.chaveNotaFiscal
+                atualizacoes.DOCNFE[0].NNF = dadosXML.numeroNotaFiscal
+            }
 
-            sendObj.DOCNFE[0].CHAVENFE = dadosXML.chaveNotaFiscal
-            sendObj.DOCNFE[0].NNF = dadosXML.numeroNotaFiscal
+            const valorCargaCorrigido = Number(dadosXML.valorCarga)
+            atualizacoes.VALORCARGA = valorCargaCorrigido
+            atualizacoes.DESCCARGA = dadosXML.produtoPredominante;
+            atualizacoes.TIPOCARGA = dadosXML.produtoPredominante;
+            atualizacoes.ICMS_VALORICMS = parseFloat(dadosXML.valorICMS);
+            atualizacoes.VALORSERVICO = dadosXML.valorServico
+            atualizacoes.VALORRECEBER = dadosXML.valorServico
+            atualizacoes.ICMS_VALORBC = dadosXML.valorServico
+
+
+            if (atualizacoes.IBSCBS && empresa.name !== 'GADELOG') {
+                atualizacoes.IBSCBS.vBC = parseFloat(dadosXML.valorIBS)
+                atualizacoes.IBSCBS.vIBSUF = parseFloat(dadosXML.valorIBS)
+                atualizacoes.IBSCBS.vIBS = parseFloat(dadosXML.valorIBS)
+                atualizacoes.IBSCBS.vCBS = parseFloat(dadosXML.percentualCBS)
+            }
+
+            if (atualizacoes.CARGAQTD && atualizacoes.CARGAQTD[0]) {
+                atualizacoes.CARGAQTD[0].QUANTIDADE = parseFloat(dadosXML.quantidadeCarga);
+                atualizacoes.PESOKG = parseFloat(dadosXML.quantidadeCarga);
+            }
+
+
+            if (cteSelecionado) {
+                setCteSelecionado({ ...cteSelecionado, ...atualizacoes });
+            }
+
+            toast.info('Infomações atualizdas')
+
+
+
         }
         catch (error) {
             toast.error("Erro ao carregar dados")
@@ -273,17 +312,16 @@ export default function CRIAR() {
     }
 
     const sendData = async () => {
+
+        if (!empresa) {
+            toast.error("Empresa não encontrada")
+            return
+        }
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                toast.error('Token não encontrado. Faça login primeiro.');
-                return;
-            }
 
-
-            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, sendObj, {
+            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
                 headers: {
-                    'Authorization': 'Bearer ' + token,
+                    'Authorization': 'Bearer ' + empresa.token,
                     'Content-Type': 'application/json'
                 }
             });
@@ -294,8 +332,14 @@ export default function CRIAR() {
             toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
         }
     };
+    if (!cteSelecionado) {
+        return (
+            <></>
+        )
+    }
 
     return (
+
         <div>
             <div className="p-6">
                 <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
@@ -486,8 +530,6 @@ export default function CRIAR() {
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                             const value = e.target.value.replace('.', '').replace(',', '.');
                                             setDadosXML({ ...dadosXML, quantidadeCarga: value });
-                                            sendObj.CARGAQTD[0].QUANTIDADE = parseFloat(value) || 0;
-                                            sendObj.PESOKG = parseFloat(value) || 0;
                                         }}
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="0,00"
@@ -505,10 +547,7 @@ export default function CRIAR() {
                                         type="text"
                                         value={dadosXML.valorServico}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
-                                            sendObj.VALORSERVICO = parseFloat(value) || 0;
-                                            sendObj.VALORRECEBER = parseFloat(value) || 0;
+                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(e.target.value) });
                                         }}
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="R$ 0,00"
@@ -519,8 +558,6 @@ export default function CRIAR() {
                     </div>
 
                 )}
-                {/* 373.249.934-00  AAW1H16 */}
-
                 {tab === "Comp/Tributos" && (
                     <div className="space-y-8">
                         <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
@@ -554,16 +591,16 @@ export default function CRIAR() {
                                     </label>
                                     <input
                                         type="text"
-                                        value={dadosXML.cpf_motorista}
+                                        value={formatarCpfCnpj(dadosXML.cpf_motorista, 'cpf_motorista')}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            formatarCpfCnpj(e.target.value, 'proprietario');
+                                            setDadosXML({ ...dadosXML, cpf_motorista: e.target.value });
                                         }}
                                         id="proprietario"
                                         name="proprietario"
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="000.000.000-00"
                                     />
-                                    <span className="text-sm text-gray-500">{dadosXML.cpf_motorista}</span>
+                                    <span className="text-sm text-gray-500">{dadosXML.nome_motorista}</span>
                                 </div>
                             </div>
                         </div>
@@ -674,7 +711,6 @@ export default function CRIAR() {
                                         onChange={(e) => {
                                             const value = e.target.value.replace('R$', '').replace(',', '.').trim();
                                             setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
-                                            sendObj.IBSCBS.vBC = parseFloat(value) || 0;
                                         }}
                                         id="valorBC"
                                         name="valorBC"
@@ -692,11 +728,9 @@ export default function CRIAR() {
                                     </label>
                                     <input
                                         type="text"
-                                        value={dadosXML.valorIBS}
+                                        value={dadosXML.valorIBS || ''}
                                         onChange={(e) => {
-                                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
                                             setDadosXML({ ...dadosXML, valorIBS: e.target.value });
-                                            sendObj.IBSCBS.vBC = parseFloat(value) || 0;
                                         }}
                                         id="valorBC"
                                         name="valorBC"
@@ -716,11 +750,11 @@ export default function CRIAR() {
                                     </label>
                                     <input
                                         type="text"
-                                        value={dadosXML.percentualCBS}
+                                        value={cteSelecionado.IBSCBS?.vCBS}
                                         onChange={(e) => {
                                             const value = e.target.value.replace('%', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, percentualCBS: e.target.value });
-                                            sendObj.IBSCBS.vCBS = parseFloat(value) || 0;
+                                            setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vCBS: parseFloat(value) || 0 } });
+
                                         }}
                                         id="percentualCBS"
                                         name="percentualCBS"
@@ -737,12 +771,11 @@ export default function CRIAR() {
                                     </label>
                                     <input
                                         type="text"
-                                        value={dadosXML.valorIBS}
+                                        value={cteSelecionado.IBSCBS?.vIBS}
                                         onChange={(e) => {
-                                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, valorIBS: e.target.value });
-                                            sendObj.IBSCBS.vIBSUF = parseFloat(value) || 0;
-                                            sendObj.IBSCBS.vIBS = parseFloat(value) || 0;
+                                            const value = e.target.value.replace(',', '.').trim();
+                                            setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vIBS: parseFloat(value) || 0 } });
+
                                         }}
                                         id="valorIBS"
                                         name="valorIBS"

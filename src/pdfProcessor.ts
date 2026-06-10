@@ -12,6 +12,19 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // TYPES
 // =========================================================
 
+
+
+
+export interface DadosCNH {
+  nome: string;
+  cpf: string;
+}
+
+export interface ExtrairCNHOptions {
+  onProgress?: (msg: string) => void;
+}
+
+
 export interface DadosDocumento {
   tipoDocumento: 'CRLV' | 'CNH' | 'DESCONHECIDO';
 
@@ -138,7 +151,7 @@ export const processarDocumento = async (
         await page.render({
           canvasContext: context,
           viewport,
-          
+
         }).promise;
 
         const blob =
@@ -315,33 +328,33 @@ const extrairCRLV = (
     // LOCAL
     // =====================================================
 
-const linhas = texto.split('\n');
+    const linhas = texto.split('\n');
 
-let encontrouDocumento = false;
+    let encontrouDocumento = false;
 
-for (const linha of linhas) {
-  const cleaned = linha.trim();
+    for (const linha of linhas) {
+      const cleaned = linha.trim();
 
-  console.log(cleaned);
+      console.log(cleaned);
 
-  // Detecta CPF ou CNPJ
-  const temDocumento = /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(cleaned);
+      // Detecta CPF ou CNPJ
+      const temDocumento = /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(cleaned);
 
-  if (temDocumento) {
-    encontrouDocumento = true;
-    continue;
-  }
+      if (temDocumento) {
+        encontrouDocumento = true;
+        continue;
+      }
 
-  // Próxima linha após CPF/CNPJ
-  if (encontrouDocumento) {
-    const matchUF = cleaned.match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
+      // Próxima linha após CPF/CNPJ
+      if (encontrouDocumento) {
+        const matchUF = cleaned.match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
 
-    if (matchUF) {
-      dados.local = matchUF[1];
-      encontrouDocumento = false;
+        if (matchUF) {
+          dados.local = matchUF[1].slice(-2);
+          encontrouDocumento = false;
+        }
+      }
     }
-  }
-}
 
     // =====================================================
     // CARROCERIA
@@ -486,7 +499,7 @@ export const extrairCNH = (
           cleaned.includes(v)
         )
       ) {
-        dados.local = cleaned;
+        dados.local = cleaned.slice(-2) || "";
       }
     }
   } catch (error) {
@@ -524,8 +537,252 @@ const limparTexto = (texto: string) => {
 // EXTRAIR TAC/RNTRC DE IMAGEM
 // =========================================================
 
+export interface DadosCNH {
+  nome: string;
+  cpf: string;
+}
+
 export interface ExtrairTACOptions {
   onProgress?: (message: string) => void;
+}
+
+export async function extrairDadosCNH(
+  file: File,
+  options?: ExtrairCNHOptions
+): Promise<DadosCNH | null> {
+  const { onProgress } = options || {};
+
+  try {
+    let textoOCR = '';
+
+    const isPdf =
+      file.type === 'application/pdf' ||
+      file.name.toLowerCase().endsWith('.pdf');
+
+    // ==========================
+    // PDF
+    // ==========================
+    if (isPdf) {
+      onProgress?.('Processando PDF...');
+
+      const pdfBuffer = await file.arrayBuffer();
+
+      const pdf = await pdfjsLib.getDocument({
+        data: pdfBuffer,
+      }).promise;
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        onProgress?.(
+          `Renderizando página ${pageNum}/${pdf.numPages}`
+        );
+
+        const page = await pdf.getPage(pageNum);
+
+        const viewport = page.getViewport({
+          scale: 6,
+        });
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext(
+          '2d'
+        ) as CanvasRenderingContext2D;
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: ctx,
+          viewport,
+        }).promise;
+
+        // remove QR Code
+        const cropCanvas =
+          document.createElement('canvas');
+
+        const cropCtx =
+          cropCanvas.getContext('2d')!;
+
+        cropCanvas.width = canvas.width * 0.58;
+        cropCanvas.height = canvas.height;
+
+        cropCtx.drawImage(
+          canvas,
+          0,
+          0,
+          canvas.width * 0.58,
+          canvas.height,
+          0,
+          0,
+          cropCanvas.width,
+          cropCanvas.height
+        );
+
+        const blob =
+          await new Promise<Blob | null>(
+            (resolve) =>
+              cropCanvas.toBlob(
+                resolve,
+                'image/png',
+                1
+              )
+          );
+
+        if (!blob) continue;
+
+        onProgress?.(
+          `Executando OCR página ${pageNum}`
+        );
+
+        const result =
+          await Tesseract.recognize(
+            blob,
+            'por',
+            {
+              logger: (m) => {
+                if (
+                  m.status ===
+                  'recognizing text'
+                ) {
+                  onProgress?.(
+                    `OCR ${Math.round(
+                      m.progress * 100
+                    )}%`
+                  );
+                }
+              },
+            }
+          );
+
+        textoOCR +=
+          '\n' + result.data.text;
+
+        canvas.remove();
+        cropCanvas.remove();
+      }
+
+      await pdf.destroy();
+    }
+
+    // ==========================
+    // IMAGEM
+    // ==========================
+    else {
+      onProgress?.(
+        'Processando imagem...'
+      );
+
+      const result =
+        await Tesseract.recognize(
+          file,
+          'por',
+          {
+            logger: (m) => {
+              if (
+                m.status ===
+                'recognizing text'
+              ) {
+                onProgress?.(
+                  `OCR ${Math.round(
+                    m.progress * 100
+                  )}%`
+                );
+              }
+            },
+          }
+        );
+
+      textoOCR = result.data.text;
+    }
+
+    // ==========================
+    // LIMPEZA
+    // ==========================
+    textoOCR = textoOCR
+      .toUpperCase()
+      .replace(/\r/g, '\n')
+      .replace(/[|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+
+    // ==========================
+    // CPF
+    // ==========================
+    const cpfMatch =
+      textoOCR.match(
+        /CPF[\s\S]{0,80}?(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i
+      );
+
+    const cpf = cpfMatch?.[1] || '';
+
+    // ==========================
+    // NOME
+    // ==========================
+    let nome = '';
+
+    // 1 - MRZ (mais confiável)
+    const mrzMatch = textoOCR.match(
+      /([A-Z]+(?:<{1,2}[A-Z]+)+)<{2,}/
+    );
+
+    if (mrzMatch) {
+      nome = mrzMatch[1]
+        .replace(/<{1,2}/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // 2 - Nome antes da primeira data
+    if (!nome) {
+      const match = textoOCR.match(
+        /([A-ZÀ-Ú]{2,}(?:\s+[A-ZÀ-Ú]{2,}){1,8})\s+\d{2}\/\d{2}\/\d{4}/
+      );
+
+      if (match) {
+        nome = match[1]
+          .replace(
+            /^(DRIVER LICENSE|PERMISO DE CONDUCCION|NAME AND SURNAME)\s+/,
+            ''
+          )
+          .trim();
+      }
+    }
+
+    // 3 - Procura após PERMISO DE CONDUCCION
+    if (!nome) {
+      const match = textoOCR.match(
+        /PERMISO\s+DE\s+CONDUCCION\s*[=:]?\s*([A-ZÀ-Ú\s]+?)\s+\d{2}\/\d{2}\/\d{4}/
+      );
+
+      if (match) {
+        nome = match[1]
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+    }
+
+    // 4 - Limpeza final
+    nome = nome
+      .replace(
+        /\b(DRIVER LICENSE|PERMISO DE CONDUCCION|NAME AND SURNAME)\b/g,
+        ''
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+    const dados: DadosCNH = {
+      nome,
+      cpf,
+    };
+
+    if (!dados.nome && !dados.cpf) {
+      return null;
+    }
+
+    return dados;
+  } catch (error) {
+    console.error(error);
+    throw error;
+  }
 }
 
 export const extrairTAC = async (
@@ -563,7 +820,7 @@ export const extrairTAC = async (
         await page.render({
           canvasContext: context,
           viewport,
-          
+
         }).promise;
 
         const blob = await new Promise<Blob | null>((resolve) =>
