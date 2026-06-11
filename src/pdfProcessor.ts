@@ -195,10 +195,6 @@ export const processarDocumento = async (
 
     fullText = limparTexto(fullText);
 
-    // console.log(
-    //   'Texto final extraído:',
-    //   fullText
-    // );
 
     // =====================================================
     // DETECTAR DOCUMENTO
@@ -334,8 +330,6 @@ const extrairCRLV = (
 
     for (const linha of linhas) {
       const cleaned = linha.trim();
-
-      console.log(cleaned);
 
       // Detecta CPF ou CNPJ
       const temDocumento = /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(cleaned);

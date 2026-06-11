@@ -59,7 +59,6 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
   // sendObj.IBSCBS.vIBSUF = parseFloat((valorDoServiço * 0.001).toFixed(2));
   // sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
 
-
   return {
     valorDoServiço: Number((valorTabela * cargaEmKg).toFixed(2)),
   }

@@ -48,7 +48,6 @@ function AppContent() {
         }
       )
 
-      console.log(data)
       setCteSelecionado(data)
     } catch (e) {
       toast.error("Erro ao recuperar a nota escolhida")
@@ -80,10 +79,6 @@ function AppContent() {
       toast.error("Erro ao sair")
     }
   }
-
-  useEffect(() => {
-   console.log(dadosCRLV)
-  }, [dadosCRLV])
 
   useEffect(() => {
     if (empresa && empresa.name && tab === 'xml') {
@@ -177,7 +172,6 @@ function AppContent() {
           </button>
 
           <button
-            disabled={dadosCRLV == null}
             onClick={() => setTab('xml')}
             className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'xml'
               ? 'bg-blue-600 text-white shadow-lg'

@@ -107,7 +107,6 @@ export default function CRLVView() {
             criarProprietario()
 
         } catch (e) {
-            console.log(e)
             toast.error("Erro ao verificar se motorista está cadastrado")
         } finally {
             setLoading(false)
@@ -204,7 +203,6 @@ export default function CRLVView() {
             criarMotorista()
 
         } catch (e) {
-            console.log(e)
             toast.error("Erro ao verificar se motorista está cadastrado")
         } finally {
             setLoading(false)

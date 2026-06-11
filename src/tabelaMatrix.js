@@ -38,6 +38,7 @@ export const buscarValor14Ton = (cidade, uf) => {
   return buscarValorPorColuna(cidade, uf, 'Truck 14 TON');
 };
 
+
 export const buscarValor19Ton = (cidade, uf) => {
   return buscarValorPorColuna(cidade, uf, 'Bitruck 19 TON');
 };

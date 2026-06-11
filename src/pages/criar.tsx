@@ -114,6 +114,7 @@ export default function CRIAR() {
                     return
                 }
 
+
                 atualizacoes.valorServico = serviço.valorDoServiço
                 atualizacoes.valorIBS = (serviço.valorDoServiço * 0.001).toFixed(2).toString()
                 atualizacoes.percentualCBS = (serviço.valorDoServiço * 0.009).toFixed(2).toString()
@@ -153,9 +154,6 @@ export default function CRIAR() {
     };
 
     const loadingData = async () => {
-
-
-
 
         try {
             if (!empresa) {
