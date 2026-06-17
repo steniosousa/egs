@@ -1,4 +1,5 @@
 export default function CTEView({ ctes, buscarCteEscolhida }: { ctes: any[], buscarCteEscolhida: (cte: string) => void }) {
+    console.log(ctes)
     return (
         <div>
             <div className="bg-white rounded-lg shadow-lg p-6">
@@ -17,8 +18,8 @@ export default function CTEView({ ctes, buscarCteEscolhida }: { ctes: any[], bus
                                     <div>
                                         <p className="font-semibold text-gray-800">CT-e: {cte.IDCTE}</p>
                                         <p className="text-sm text-gray-600">Remetente: {cte.REM_NOME}</p>
-                                        <p className="text-sm text-gray-600">Origem: {cte.NOMECIDADEEMISSAO}</p>
-                                        <p className="text-sm text-gray-600">Destino: {cte.NOMECIDADEFIMSERV}</p>
+                                        <p className="text-sm text-gray-600">Origem: {cte.NOMECIDADEEMISSAO} - {cte.UFINISERV}</p>
+                                        <p className="text-sm text-gray-600">Destino: {cte.NOMECIDADEFIMSERV} - {cte.DEST_UF}</p>
                                     </div>
                                     <div className="text-right">
                                         <p className="text-sm text-gray-500">

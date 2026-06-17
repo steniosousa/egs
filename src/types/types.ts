@@ -63,8 +63,8 @@ export interface CTE {
     "NOMECIDADEEMISSAO": "FORTALEZA",
     "NOMECIDADEINICIOSERV": "FORTALEZA",
     "NOMECIDADEFIMSERV": "SANTA CRUZ",
-    "UFINISERV": "CE",
-    "UFFIMSERV": "RN",
+    "UFINISERV": string // "CE",
+    "UFFIMSERV": string //"RN",
     "ICMS_VALORBC": number, // 7819.36,
     "ICMS_VALORICMS": number, // 938.32,
     "IDVEICULO": 35689,
@@ -102,7 +102,7 @@ export interface CTE {
     },
     "Veiculos": [
         {
-             "IDENT": number,
+            "IDENT": number,
             "IDCTE": number,
             "CODVEICULO": null,
             "RENAVAN": string,
@@ -117,11 +117,11 @@ export interface CTE {
             "TIPOPROPRIETARIO": number,
             "IDVEICULO": number,
             'TIPORODADO': string,
-            'TIPOCARROCERIA':string,
-            'CPFCNPJ':string,
-            'NOMEPROPRIETARIO':string,
-            'INSCESTADUAL':string,
-            'UFINSCESTADUAL':string
+            'TIPOCARROCERIA': string,
+            'CPFCNPJ': string,
+            'NOMEPROPRIETARIO': string,
+            'INSCESTADUAL': string,
+            'UFINSCESTADUAL': string
         }
     ],
     "IBSCBS": {

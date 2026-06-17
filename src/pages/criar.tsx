@@ -10,22 +10,8 @@ export default function CRIAR() {
     const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
     const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
 
-    const formatarValor = (valor: string) => {
-        return Number(valor).toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-    };
-
 
     const processarXML = (xmlContent: string) => {
-        // if (!cteSelecionado) {
-        //     toast.error('Sem CTE selecionado');
-        //     return;
-        // }
-
-
-
         try {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
@@ -215,6 +201,7 @@ export default function CRIAR() {
                 atualizacoes.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
                 atualizacoes.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
                 atualizacoes.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
+                atualizacoes.UFFIMSERV = Remetente.data[0].CODESTADO;
                 atualizacoes.IDREMETENTE = Remetente.data[0].IDCADASTRO
                 setDadosXML({ ...dadosXML, nome_remetente: Remetente.data[0].NOME })
             } else {
@@ -223,7 +210,7 @@ export default function CRIAR() {
 
             if (destinatario.data[0]) {
                 atualizacoes.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
-                atualizacoes.UFINISERV = destinatario.data[0].CODESTADO;
+                atualizacoes.UFFIMSERV = destinatario.data[0].CODESTADO;
                 atualizacoes.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
                 atualizacoes.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
                 atualizacoes.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
@@ -276,12 +263,17 @@ export default function CRIAR() {
             atualizacoes.VALORCARGA = valorCargaCorrigido
             atualizacoes.DESCCARGA = dadosXML.produtoPredominante;
             atualizacoes.TIPOCARGA = dadosXML.produtoPredominante;
-            atualizacoes.ICMS_VALORICMS = parseFloat(dadosXML.valorICMS);
             atualizacoes.VALORSERVICO = dadosXML.valorServico
             atualizacoes.VALORRECEBER = dadosXML.valorServico
-            atualizacoes.ICMS_VALORBC = dadosXML.valorServico
 
 
+            if (atualizacoes.UFINISERV === "CE" && atualizacoes.UFFIMSERV !== "CE") {
+                atualizacoes.ICMS_VALORICMS = parseFloat(dadosXML.valorICMS);
+                atualizacoes.ICMS_VALORBC = dadosXML.valorServico
+            } else {
+                atualizacoes.ICMS_VALORICMS = 0;
+                atualizacoes.ICMS_VALORBC = 0
+            }
             if (atualizacoes.IBSCBS && empresa.name !== 'GADELOG') {
                 atualizacoes.IBSCBS.vBC = parseFloat(dadosXML.valorIBS)
                 atualizacoes.IBSCBS.vIBSUF = parseFloat(dadosXML.valorIBS)

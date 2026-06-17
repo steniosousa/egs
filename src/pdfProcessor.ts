@@ -388,16 +388,18 @@ const extrairCRLV = (
       }
     }
 
-    //modelo
-    // ***
-    // M.BENZ/L 1620
+    const modelo = texto
+      .split('\n')
+      .map(l => l.trim())
+      .find(l =>
+        /^[A-Z0-9]{2,}\/[A-Z0-9]/i.test(l) &&  
+        /[A-Z]/i.test(l) &&                   
+        l.length > 5                          
+      );
 
-
-    const modelo = texto.split('***')[1]?.trim().split('\n')[0];
     if (modelo) {
       dados.modelo = modelo;
     }
-
 
     //capacidade
     const capacidade = texto.split('ALUGUEL')[1]?.trim().split('\n')[0]
@@ -714,55 +716,17 @@ export async function extrairDadosCNH(
     // ==========================
     let nome = '';
 
-    // 1 - MRZ (mais confiável)
-    const mrzMatch = textoOCR.match(
-      /([A-Z]+(?:<{1,2}[A-Z]+)+)<{2,}/
+    const match = textoOCR.match(
+      /[A-Z]{2,}\s*<<\s*[A-Z]{2,}(?:\s*<\s*[A-Z]{2,})+/i
     );
 
-    if (mrzMatch) {
-      nome = mrzMatch[1]
-        .replace(/<{1,2}/g, ' ')
+    if (match) {
+      nome = match[0]
+        .replace(/</g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
 
-    // 2 - Nome antes da primeira data
-    if (!nome) {
-      const match = textoOCR.match(
-        /([A-ZÀ-Ú]{2,}(?:\s+[A-ZÀ-Ú]{2,}){1,8})\s+\d{2}\/\d{2}\/\d{4}/
-      );
-
-      if (match) {
-        nome = match[1]
-          .replace(
-            /^(DRIVER LICENSE|PERMISO DE CONDUCCION|NAME AND SURNAME)\s+/,
-            ''
-          )
-          .trim();
-      }
-    }
-
-    // 3 - Procura após PERMISO DE CONDUCCION
-    if (!nome) {
-      const match = textoOCR.match(
-        /PERMISO\s+DE\s+CONDUCCION\s*[=:]?\s*([A-ZÀ-Ú\s]+?)\s+\d{2}\/\d{2}\/\d{4}/
-      );
-
-      if (match) {
-        nome = match[1]
-          .replace(/\s+/g, ' ')
-          .trim();
-      }
-    }
-
-    // 4 - Limpeza final
-    nome = nome
-      .replace(
-        /\b(DRIVER LICENSE|PERMISO DE CONDUCCION|NAME AND SURNAME)\b/g,
-        ''
-      )
-      .replace(/\s+/g, ' ')
-      .trim();
     const dados: DadosCNH = {
       nome,
       cpf,
@@ -774,7 +738,6 @@ export async function extrairDadosCNH(
 
     return dados;
   } catch (error) {
-    console.error(error);
     throw error;
   }
 }

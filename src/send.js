@@ -126,7 +126,7 @@ export let veiculo = {
     "IDVEICULOTRACAO": null,
     "IDPROPVEICULO": null,
     "RNTCPROPRIETARIO": null,
-    "CATCOMBVEICULAR": null,
+    "CATCOMBVEICULAR": "04", // quantidade de eixos
     "ALTURABAU": null,
     "LARGURABAU": null,
     "COMPRIMENTOBAU": null,
