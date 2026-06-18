@@ -80,6 +80,7 @@ export default function CRIAR() {
                 }, 0);
 
                 atualizacoes.quantidadeCarga = pesoTotal.toString();
+
             }
 
             const saidaCidade = exit?.querySelector("xMun")?.textContent || "";
@@ -95,6 +96,7 @@ export default function CRIAR() {
                     city: destinoCidade,
                     uf: destinoUF
                 }, Number(atualizacoes.quantidadeCarga))
+
                 if (!serviço) {
                     toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
                     return

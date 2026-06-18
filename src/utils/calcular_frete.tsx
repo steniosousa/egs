@@ -48,18 +48,7 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
     return
   }
 
-  // const valorDoServiço = valorTabela * cargaEmKg
-
-  // sendObj.VALORSERVICO = valorDoServiço;
-  // sendObj.VALORRECEBER = valorDoServiço;
-  // sendObj.ICMS_VALORICMS = parseFloat((valorDoServiço * 0.12).toFixed(2));
-  // sendObj.ICMS_VALORBC = valorDoServiço;
-  // sendObj.IBSCBS.vBC = Number(valorDoServiço.toFixed(2));
-  // sendObj.IBSCBS.vIBS = parseFloat((valorDoServiço * 0.001).toFixed(2));
-  // sendObj.IBSCBS.vIBSUF = parseFloat((valorDoServiço * 0.001).toFixed(2));
-  // sendObj.IBSCBS.vCBS = parseFloat((valorDoServiço * 0.009).toFixed(2));
-
   return {
-    valorDoServiço: Number((valorTabela * cargaEmKg).toFixed(2)),
+    valorDoServiço: Number((Math.ceil(valorTabela * 100) / 100 * cargaEmKg).toFixed(2))
   }
 }

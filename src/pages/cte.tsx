@@ -1,5 +1,4 @@
 export default function CTEView({ ctes, buscarCteEscolhida }: { ctes: any[], buscarCteEscolhida: (cte: string) => void }) {
-    console.log(ctes)
     return (
         <div>
             <div className="bg-white rounded-lg shadow-lg p-6">
