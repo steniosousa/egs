@@ -380,13 +380,13 @@ const extrairCRLV = (
       if (proprietario) {
         dados.proprietario = proprietario;
       }
-    } else if(carroceriaMatch === "CABINE ESTENDIDA") {
-        const proprietario = texto.split('CABINE ESTENDIDA')[1]?.trim().split('\n')[0];
+    } else if (carroceriaMatch === "CABINE ESTENDIDA") {
+      const proprietario = texto.split('CABINE ESTENDIDA')[1]?.trim().split('\n')[0];
       if (proprietario) {
         dados.proprietario = proprietario;
       }
     }
-    
+
     else {
       //fallback
       const proprietario = texto.split('NãO APLICAVEL')[1]?.trim().split('\n')[0];
@@ -399,9 +399,9 @@ const extrairCRLV = (
       .split('\n')
       .map(l => l.trim())
       .find(l =>
-        /^[A-Z0-9]{2,}\/[A-Z0-9]/i.test(l) &&  
-        /[A-Z]/i.test(l) &&                   
-        l.length > 5                          
+        /^[A-Z0-9.\s]{2,}\/[A-Z0-9]/i.test(l) &&
+        /[A-Z]/i.test(l) &&
+        l.length > 5
       );
 
     if (modelo) {
