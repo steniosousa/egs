@@ -380,7 +380,14 @@ const extrairCRLV = (
       if (proprietario) {
         dados.proprietario = proprietario;
       }
-    } else {
+    } else if(carroceriaMatch === "CABINE ESTENDIDA") {
+        const proprietario = texto.split('CABINE ESTENDIDA')[1]?.trim().split('\n')[0];
+      if (proprietario) {
+        dados.proprietario = proprietario;
+      }
+    }
+    
+    else {
       //fallback
       const proprietario = texto.split('NãO APLICAVEL')[1]?.trim().split('\n')[0];
       if (proprietario) {

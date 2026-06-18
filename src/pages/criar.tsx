@@ -310,7 +310,7 @@ export default function CRIAR() {
             return
         }
         try {
-
+            
             await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
                 headers: {
                     'Authorization': 'Bearer ' + empresa.token,

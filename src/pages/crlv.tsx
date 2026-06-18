@@ -72,7 +72,6 @@ export default function CRLVView() {
     };
 
     const verificarSeProprietarioTaCadastrado = async () => {
-
         if (!empresa) {
             toast.error("Empresa não encontrada")
             return
@@ -742,7 +741,7 @@ export default function CRLVView() {
                                 </label>
 
                                 <input
-                                    value={dadosCRLV.capacidade}
+                                    value={!isNaN(Number(dadosCRLV.capacidade)) ? dadosCRLV.capacidade : "Veículo sem Capacidade"}
                                     className={fieldClass}
                                     onChange={(e) => {
                                         setDadosCRLV({
