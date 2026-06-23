@@ -198,6 +198,13 @@ export default function CRIAR() {
                     })
             ]);
 
+            if (Motorista.data[0]) {
+                atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
+                setDadosXML({ ...dadosXML, nome_motorista: Motorista.data[0].NOME })
+            } else {
+                toast.info("Motorista não encontrado")
+            }
+
 
             if (Remetente.data[0]) {
                 atualizacoes.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
@@ -249,12 +256,7 @@ export default function CRIAR() {
                 toast.info("Veículo não encontrado")
             }
 
-            if (Motorista.data[0]) {
-                atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
-                setDadosXML({ ...dadosXML, nome_motorista: Motorista.data[0].NOME })
-            } else {
-                toast.info("Motorista não encontrado")
-            }
+
 
             if (atualizacoes.DOCNFE && atualizacoes.DOCNFE[0]) {
                 atualizacoes.DOCNFE[0].CHAVENFE = dadosXML.chaveNotaFiscal
@@ -276,11 +278,13 @@ export default function CRIAR() {
                 atualizacoes.ICMS_VALORICMS = 0;
                 atualizacoes.ICMS_VALORBC = 0
             }
-            if (atualizacoes.IBSCBS && empresa.name !== 'GADELOG') {
+            if (atualizacoes.IBSCBS) {
+                if (empresa.name !== 'GADELOG') {
+                    atualizacoes.IBSCBS.vIBS = parseFloat(dadosXML.valorIBS)
+                    atualizacoes.IBSCBS.vCBS = parseFloat(dadosXML.percentualCBS)
+                }
                 atualizacoes.IBSCBS.vBC = parseFloat(dadosXML.valorIBS)
                 atualizacoes.IBSCBS.vIBSUF = parseFloat(dadosXML.valorIBS)
-                atualizacoes.IBSCBS.vIBS = parseFloat(dadosXML.valorIBS)
-                atualizacoes.IBSCBS.vCBS = parseFloat(dadosXML.percentualCBS)
             }
 
             if (atualizacoes.CARGAQTD && atualizacoes.CARGAQTD[0]) {
@@ -310,7 +314,7 @@ export default function CRIAR() {
             return
         }
         try {
-            
+
             await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
                 headers: {
                     'Authorization': 'Bearer ' + empresa.token,
@@ -459,7 +463,7 @@ export default function CRIAR() {
                                         type="text"
                                         value={dadosXML.cpfCnpjDestinatario}
                                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            formatarCpfCnpj(e.target.value, 'destinatario');
+                                            setDadosXML({ ...dadosXML, cpfCnpjDestinatario: formatarCpfCnpj(e.target.value, 'destinatario') });
                                         }}
                                         id="destinatario"
                                         name="destinatario"

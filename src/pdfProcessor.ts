@@ -288,12 +288,12 @@ const extrairCRLV = (
     // =====================================================
     // CPF
     // =====================================================
-
-    const cpfs = texto.match(
-      /\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/g
+    const docs = texto.match(
+      /\b(?:\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/g
     );
-    if (cpfs?.length) {
-      dados.cpf = cpfs[cpfs.length - 1];
+
+    if (docs?.length) {
+      dados.cpf = docs[0]
     }
 
     // =====================================================
@@ -415,10 +415,24 @@ const extrairCRLV = (
     }
 
 
-    //peso
     const peso = texto.split('/****')[1]?.trim().split('\n')[0]
     if (peso) {
       dados.peso = (Number(peso) * 1000).toString();
+    }
+
+    if (!dados.peso) {
+      const linhas2 = texto.split('\n').map(l => l.trim()).filter(Boolean);
+
+      const idxPotencia = linhas2.findIndex(l => /\d+CV\/\d+/i.test(l));
+
+      if (idxPotencia !== -1) {
+        const peso = linhas2[idxPotencia + 1];
+
+        if (/^\d+(\.\d+)?$/.test(peso)) {
+          dados.peso = String(Number(peso) * 1000);
+        }
+      }
+
     }
 
 

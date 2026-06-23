@@ -17,7 +17,7 @@ interface AppContextType {
     token_timestamp: string;
   } | null) => void;
   dadosCRLV: CRLV | null;
-  setDadosCRLV: (dados: CRLV) => void;
+  setDadosCRLV: (dados: CRLV | null) => void;
   limparDados: () => void;
   getToken: (url: "GADELOG" | "INTERMEDIUM") => Promise<void>;
   cteSelecionado: CTE | null;
