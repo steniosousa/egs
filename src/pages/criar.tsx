@@ -224,6 +224,13 @@ export default function CRIAR() {
                 setDadosXML({ ...dadosXML, nome_destinatario: destinatario.data[0].NOME })
             } else {
                 toast.info("Destinatário não encontrado")
+                const documento = dadosXML.cpfCnpjDestinatario.replace(/\D/g, "");
+
+                if (documento.length === 14) {
+                    await getDadasCNPJ();
+                    await createDestinatário();
+                    return;
+                }
                 setDestinatarioNaoEncontrado(true)
             }
             if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
@@ -358,7 +365,6 @@ export default function CRIAR() {
                 Uf_destinatario: data.Uf
             });
 
-            console.log(data)
         } catch (error) {
             console.error(error)
             toast.error("Erro ao buscar dados do CNPJ")
@@ -548,71 +554,111 @@ export default function CRIAR() {
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="00.000.000/0000-00"
                                     />
-                                    <button onClick={getDadasCNPJ} type="button">Buscar por CNPJ</button>
 
                                     <span className="text-sm text-gray-500">{dadosXML.nome_destinatario}</span>
 
                                     {destinatarioNaoEncontrado && (
-                                        <div>
-                                            <div className="text-sm">
-                                                <label>Nome / Incrição estadual</label>
-                                                <input
-                                                    type="text"
-                                                    value={dadosXML.nome_destinatario}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                        setDadosXML({ ...dadosXML, nome_destinatario: e.target.value });
-                                                    }}
-                                                    id="nome_destinatario"
-                                                    name="nome_destinatario"
-                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
-                                                    placeholder="Nome / Incrição estadual"
-                                                />
+                                        <div className="mt-6 rounded-2xl border border-amber-200 bg-white shadow-lg overflow-hidden">
+                                            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
+                                                <h3 className="text-lg font-semibold text-white">
+                                                    Destinatário não encontrado
+                                                </h3>
+                                                <p className="mt-1 text-sm text-amber-100">
+                                                    Preencha os dados abaixo para cadastrar um novo destinatário.
+                                                </p>
                                             </div>
-                                            <div>
-                                                <label>Email</label>
-                                                <input
-                                                    type="text"
-                                                    value={dadosXML.email_destinatario}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                        setDadosXML({ ...dadosXML, email_destinatario: e.target.value });
-                                                    }}
-                                                    id="email_destinatario"
-                                                    name="email_destinatario"
-                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
-                                                    placeholder="Email"
-                                                />
+
+                                            <div className="p-6 space-y-5">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                                                    <div>
+                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
+                                                            Nome / Inscrição Estadual
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={dadosXML.nome_destinatario}
+                                                            onChange={(e) =>
+                                                                setDadosXML({
+                                                                    ...dadosXML,
+                                                                    nome_destinatario: e.target.value,
+                                                                })
+                                                            }
+                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                                                            placeholder="Nome ou Inscrição Estadual"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
+                                                            E-mail
+                                                        </label>
+                                                        <input
+                                                            type="email"
+                                                            value={dadosXML.email_destinatario}
+                                                            onChange={(e) =>
+                                                                setDadosXML({
+                                                                    ...dadosXML,
+                                                                    email_destinatario: e.target.value,
+                                                                })
+                                                            }
+                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                                                            placeholder="email@empresa.com"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
+                                                            Telefone
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={dadosXML.fone_destinatario}
+                                                            onChange={(e) =>
+                                                                setDadosXML({
+                                                                    ...dadosXML,
+                                                                    fone_destinatario: e.target.value,
+                                                                })
+                                                            }
+                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                                                            placeholder="(99) 99999-9999"
+                                                        />
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
+                                                            Cidade
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={dadosXML.cidade_destinatario}
+                                                            onChange={(e) =>
+                                                                setDadosXML({
+                                                                    ...dadosXML,
+                                                                    cidade_destinatario: e.target.value,
+                                                                })
+                                                            }
+                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                                                            placeholder="Cidade"
+                                                        />
+                                                    </div>
+
+                                                </div>
+
+                                                <div className="flex justify-end border-t pt-5">
+                                                    <button onClick={getDadasCNPJ} type="button"
+                                                        className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-3 font-medium text-white shadow-md transition-all hover:bg-orange-700 hover:shadow-lg active:scale-95"
+                                                    >Buscar por CNPJ</button>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={createDestinatário}
+                                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-95"
+                                                    >
+                                                        Criar Destinatário
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label>Fone</label>
-                                                <input
-                                                    type="text"
-                                                    value={dadosXML.fone_destinatario}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                        setDadosXML({ ...dadosXML, fone_destinatario: e.target.value });
-                                                    }}
-                                                    id="fone_destinatario"
-                                                    name="fone_destinatario"
-                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
-                                                    placeholder="Fone"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label>cidade</label>
-                                                <input
-                                                    type="text"
-                                                    value={dadosXML.cidade_destinatario}
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                        setDadosXML({ ...dadosXML, cidade_destinatario: e.target.value });
-                                                    }}
-                                                    id="cidade_destinatario"
-                                                    name="cidade_destinatario"
-                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
-                                                    placeholder="cidade"
-                                                />
-                                            </div>
-                                            <button type="button" onClick={createDestinatário} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                                Criar Destinatário
-                                            </button>
                                         </div>
                                     )}
                                 </div>
