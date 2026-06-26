@@ -8,6 +8,7 @@ import calcularFrete from "../utils/calcular_frete";
 
 export default function CRIAR() {
     const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
+    const [destinatarioNaoEncontrado, setDestinatarioNaoEncontrado] = useState(false)
     const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
 
 
@@ -15,9 +16,6 @@ export default function CRIAR() {
         try {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
-
-
-
             const icmsTot = xmlDoc.querySelector("ICMSTot");
             const vol = xmlDoc.querySelector("vol");
             const ide = xmlDoc.querySelector("ide");
@@ -25,7 +23,6 @@ export default function CRIAR() {
             const dest = xmlDoc.querySelector("dest");
             const destination = xmlDoc.querySelector("enderDest");
             const emit = xmlDoc.querySelector("emit");
-
             const atualizacoes: Partial<XML> = {};
 
 
@@ -226,7 +223,8 @@ export default function CRIAR() {
                 atualizacoes.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
                 setDadosXML({ ...dadosXML, nome_destinatario: destinatario.data[0].NOME })
             } else {
-                toast.info("Destinatpario não encontrado")
+                toast.info("Destinatário não encontrado")
+                setDestinatarioNaoEncontrado(true)
             }
             if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
                 atualizacoes.Veiculos[0] = {
@@ -247,7 +245,6 @@ export default function CRIAR() {
                     NOMEPROPRIETARIO: VeiculoTração.data[0].NOMEPROPRIETARIO,
                     INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
                     UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
-                    TIPOPROPRIETARIO: VeiculoTração.data[0].TIPOPROPRIETARIO,
                     IDVEICULO: VeiculoTração.data[0].IDVEICULO,
                 }
                 atualizacoes.IDVEICULO = VeiculoTração.data[0].IDVEICULO
@@ -294,7 +291,11 @@ export default function CRIAR() {
 
 
             if (cteSelecionado) {
-                setCteSelecionado({ ...cteSelecionado, ...atualizacoes });
+                setCteSelecionado({
+                    ...cteSelecionado,
+                    ...atualizacoes,
+                    DOCNFE: atualizacoes.DOCNFE ? [...atualizacoes.DOCNFE] : []
+                });
             }
 
             toast.info('Infomações atualizdas')
@@ -328,6 +329,83 @@ export default function CRIAR() {
             toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
         }
     };
+
+    const getDadasCNPJ = async () => {
+        if (!empresa) {
+            toast.error("Empresa não selecionada")
+            return
+        }
+        try {
+            const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/Sistema/GetCadastroReceiraFederal?CNPJ=${dadosXML.cpfCnpjDestinatario.replace(/\D/g, '')}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${empresa.token}`
+                    }
+                })
+            setDadosXML({
+                ...dadosXML,
+                email_destinatario: data.Email,
+                fone_destinatario: data.Telefone,
+                nome_destinatario: data.Nome,
+                nome_fantasia: data.Fantasia,
+                cep_destinatario: data.Cep,
+                rua_destinatario: data.Logradouro,
+                bairro_destinario: data.Bairro,
+                numero_endereco_destinatario: data.Numero,
+                complemente_destinatario: data.Complemento,
+                cidade_estado_destinatario: data.CIDADEESTADO,
+                CODCIDADE: data.CODCIDADE,
+                Uf_destinatario: data.Uf
+            });
+
+            console.log(data)
+        } catch (error) {
+            console.error(error)
+            toast.error("Erro ao buscar dados do CNPJ")
+        }
+    }
+
+    const createDestinatário = async () => {
+        if (!empresa) {
+            toast.error("Empresa nao selecionada")
+            return
+        }
+        try {
+            const { data } = await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
+                {
+                    RAZAOSOCIAL: dadosXML.nome_destinatario,
+                    NOME: dadosXML.nome_destinatario,
+                    CPFCNPJ: dadosXML.cpfCnpjDestinatario.replace(/\D/g, ''),
+                    CONSUMIDORFINAL: "1",
+                    CONTRIBUINTEICMS: "9",
+                    FONE: dadosXML.fone_destinatario,
+                    EMAIL: dadosXML.email_destinatario,
+                    EMAILNFE: dadosXML.email_destinatario,
+                    ENDERECO: dadosXML.rua_destinatario,
+                    BAIRRO: dadosXML.bairro_destinario,
+                    NUMERO: dadosXML.numero_endereco_destinatario,
+                    CEP: dadosXML.cep_destinatario,
+                    CODCIDADE: dadosXML.CODCIDADE,
+                    CODESTADO: dadosXML.Uf_destinatario,
+                    CODPAIS: "1058",
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${empresa.token}`
+                    }
+                }
+            )
+            if (!data.IDCADASTRO) {
+                toast.error("Erro ao criar destinatário")
+                return
+            }
+
+
+            toast.success("destinatário cadastrado com sucesso!")
+        } catch (e) {
+            toast.error("Erro ao criar destinatário")
+        }
+    }
     if (!cteSelecionado) {
         return (
             <></>
@@ -470,7 +548,73 @@ export default function CRIAR() {
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="00.000.000/0000-00"
                                     />
+                                    <button onClick={getDadasCNPJ} type="button">Buscar por CNPJ</button>
+
                                     <span className="text-sm text-gray-500">{dadosXML.nome_destinatario}</span>
+
+                                    {destinatarioNaoEncontrado && (
+                                        <div>
+                                            <div className="text-sm">
+                                                <label>Nome / Incrição estadual</label>
+                                                <input
+                                                    type="text"
+                                                    value={dadosXML.nome_destinatario}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                        setDadosXML({ ...dadosXML, nome_destinatario: e.target.value });
+                                                    }}
+                                                    id="nome_destinatario"
+                                                    name="nome_destinatario"
+                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
+                                                    placeholder="Nome / Incrição estadual"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>Email</label>
+                                                <input
+                                                    type="text"
+                                                    value={dadosXML.email_destinatario}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                        setDadosXML({ ...dadosXML, email_destinatario: e.target.value });
+                                                    }}
+                                                    id="email_destinatario"
+                                                    name="email_destinatario"
+                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
+                                                    placeholder="Email"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>Fone</label>
+                                                <input
+                                                    type="text"
+                                                    value={dadosXML.fone_destinatario}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                        setDadosXML({ ...dadosXML, fone_destinatario: e.target.value });
+                                                    }}
+                                                    id="fone_destinatario"
+                                                    name="fone_destinatario"
+                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
+                                                    placeholder="Fone"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>cidade</label>
+                                                <input
+                                                    type="text"
+                                                    value={dadosXML.cidade_destinatario}
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                        setDadosXML({ ...dadosXML, cidade_destinatario: e.target.value });
+                                                    }}
+                                                    id="cidade_destinatario"
+                                                    name="cidade_destinatario"
+                                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 transition duration-150 ease-in-out"
+                                                    placeholder="cidade"
+                                                />
+                                            </div>
+                                            <button type="button" onClick={createDestinatário} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                                Criar Destinatário
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

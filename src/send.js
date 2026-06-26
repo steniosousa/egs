@@ -109,6 +109,7 @@ export let veiculo = {
     "PROPRIO": false,
     "TIPOVEICULO": "R",
     "TIPOCARROCERIA": "01",
+    "TIPORODADO": "01",
     "RENAVAN": "123456789",
     "CRLV": "",
     "CAPACIDADEKG": 66666,

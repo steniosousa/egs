@@ -73,6 +73,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     valorICMS: '0',
     saida: { city: '', uf: '' },
     destino: { city: '', uf: '' },
+    bairro_destinario: "",
+    cep_destinatario: "",
+    cidade_destinatario: "",
+    cidade_estado_destinatario: "",
+    CODCIDADE: 0,
+    complemente_destinatario: "",
+    email_destinatario: "",
+    fone_destinatario: "",
+    nome_fantasia: "",
+    numero_endereco_destinatario: "",
+    rua_destinatario: "",
+    Uf_destinatario: "",
   });
   const [cteSelecionado, setCteSelecionado] = useState<CTE | null>(null)
 

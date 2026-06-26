@@ -35,12 +35,12 @@ export default function CRLVView() {
                         modelo: dados.modelo || '',
                         capacidade: dados.capacidade || '',
                         peso: dados.peso || '',
-                        tipoProprietario: '',
                         tipoCarroceria: '',
                         rntc_veículo: '',
                         tipoVeiculo: '',
                         rntc_proprietatio: '',
                         tipoRodado: "",
+                        tipoProprietario: "",
                         nome_motorista: "",
                         cpf_motorista: '',
                         rntc_motorista: ''
@@ -190,8 +190,8 @@ export default function CRLVView() {
                     ...dadosXML,
                     cpf_motorista: dadosCRLV.cpf_motorista.replace(/\D/g, ''),
                     nome_motorista: data.value[0].NOME,
-
                 })
+                veiculo.IDPROPVEICULO = data.value[0].IDCADASTRO
 
                 toast.info("Motorista já cadastrado")
 
@@ -213,6 +213,7 @@ export default function CRLVView() {
             toast.error("Empresa não encontrada")
             return
         }
+        await verificarSeProprietarioTaCadastrado()
         if (!dadosCRLV) {
             toast.error("INFORME A PLACA DO VEÍCULO")
             return
@@ -223,12 +224,13 @@ export default function CRLVView() {
         veiculo.UF = dadosCRLV.local?.slice(-2)
         veiculo.DESCRICAO = dadosCRLV.modelo
         veiculo.RENAVAN = dadosCRLV.renavam
-        veiculo.TIPOPROPRIETARIO = dadosCRLV.tipoProprietario
+        veiculo.TIPOPROPRIETARIO = "1"
         veiculo.TIPOCARROCERIA = dadosCRLV.tipoCarroceria
+        veiculo.TIPORODADO = dadosCRLV.tipoRodado
         veiculo.TIPOVEICULO = dadosCRLV.tipoVeiculo
         veiculo.RNTC = dadosCRLV.rntc_veículo
 
-        if (!dadosCRLV.placa || !dadosCRLV.capacidade || !dadosCRLV.peso || !dadosCRLV.local || !dadosCRLV.modelo || !dadosCRLV.renavam || !dadosCRLV.tipoProprietario || !dadosCRLV.tipoCarroceria || !dadosCRLV.tipoVeiculo || !dadosCRLV.rntc_veículo) {
+        if (!dadosCRLV.placa || !dadosCRLV.capacidade || !dadosCRLV.peso || !dadosCRLV.local || !dadosCRLV.modelo || !dadosCRLV.renavam || !dadosCRLV.tipoCarroceria || !dadosCRLV.tipoVeiculo || !dadosCRLV.rntc_veículo) {
             toast.error("INFORME A PLACA, CAPACIDADE, PESO, LOCAL, MODELO, RENAVAM, TIPO DE PROPRIETÁRIO, TIPO DE CARROCERIA, TIPO DE VEÍCULO E RNTC")
             return
         }
@@ -327,6 +329,7 @@ export default function CRLVView() {
                 ...dadosXML,
                 cpf_motorista: dadosCRLV.cpf_motorista.replace(/\D/g, ''),
             })
+            veiculo.IDPROPVEICULO = data.value[0].IDCADASTRO
             toast.success("Motorista cadastrado com sucesso!")
         } catch (e) {
             toast.error("Erro ao criar motorista")
@@ -803,7 +806,7 @@ export default function CRLVView() {
                                 </div>
 
                                 {/* Tipo Proprietário */}
-                                <div>
+                                {/* <div>
                                     <label className="block text-sm font-medium text-slate-600 mb-2">
                                         Tipo de Proprietário
                                     </label>
@@ -823,7 +826,7 @@ export default function CRLVView() {
                                         <option value="1">TAC-INDEPENDENTE</option>
                                         <option value="2">OUTROS</option>
                                     </select>
-                                </div>
+                                </div> */}
 
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-600 mb-2">
@@ -1090,117 +1093,6 @@ export default function CRLVView() {
 
 
 
-                                </div>
-                                <div className="w-full flex justify-center mt-10">
-                                    <button
-                                        type="button"
-                                        onClick={verificarSeProprietarioTaCadastrado}
-                                        disabled={loading}
-                                        className="
-                                    h-12
-                                    px-6
-                                    bg-blue-600
-                                    hover:bg-blue-700
-                                    disabled:bg-blue-400
-                                    disabled:cursor-not-allowed
-                                    text-white
-                                    font-semibold
-                                    rounded-xl
-                                    shadow-sm
-                                    transition-all
-                                    flex
-                                    items-center
-                                    justify-center
-                                    gap-2
-                                "
-                                    >
-                                        {loading ? (
-                                            <>
-                                                <svg
-                                                    className="w-5 h-5 animate-spin"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <circle
-                                                        cx="12"
-                                                        cy="12"
-                                                        r="10"
-                                                        stroke="currentColor"
-                                                        strokeWidth="4"
-                                                        opacity="0.25"
-                                                    />
-                                                    <path
-                                                        fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                                                    />
-                                                </svg>
-
-                                                Processando...
-                                            </>
-                                        ) : (
-                                            "Processar"
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* DESTINATÁRIO */}
-                            <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6">
-
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center">
-                                        👤
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-semibold text-slate-800">
-                                            Proprietário
-                                        </h3>
-
-                                        <p className="text-sm text-slate-500">
-                                            Dados do proprietário do veículo
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="grid md:grid-cols-2 gap-5">
-
-                                    {/* CPF/CNPJ */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-600 mb-2">
-                                            CPF/CNPJ do proprietario
-                                        </label>
-
-                                        <input
-                                            type="text"
-                                            value={dadosCRLV.cpf_proprietario}
-                                            onChange={(e) => {
-                                                setDadosCRLV({ ...dadosCRLV, cpf_proprietario: e.target.value });
-                                                proprietário.CPFCNPJ = e.target.value;
-                                            }}
-                                            className={fieldClass}
-                                        />
-                                    </div>
-
-                                    {/* Proprietário */}
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-600 mb-2">
-                                            Inscrição Estadual
-                                        </label>
-
-                                        <input
-                                            type="text"
-                                            value={dadosCRLV.proprietario}
-                                            onChange={(e) => {
-                                                setDadosCRLV({
-                                                    ...dadosCRLV,
-                                                    proprietario: e.target.value,
-                                                });
-                                                proprietário.RAZAOSOCIAL = e.target.value;
-                                            }}
-                                            className={fieldClass}
-                                        />
-                                    </div>
                                 </div>
                                 <div className="w-full flex justify-center mt-10">
                                     <button
