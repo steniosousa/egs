@@ -85,6 +85,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     numero_endereco_destinatario: "",
     rua_destinatario: "",
     Uf_destinatario: "",
+    INSCESTADUAL_destinatario: "",
   });
   const [cteSelecionado, setCteSelecionado] = useState<CTE | null>(null)
 

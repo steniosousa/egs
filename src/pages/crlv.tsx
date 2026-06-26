@@ -98,9 +98,9 @@ export default function CRLVView() {
 
             if (data.value[0]) {
                 toast.info("Proprietário já cadastrado")
+                veiculo.IDCADASTRO = data.value[0].IDCADASTRO
                 return
             }
-
             toast.info('Proprietário em processo de cadastro')
 
             criarProprietario()
@@ -185,13 +185,14 @@ export default function CRLVView() {
                 }
             })
 
+
             if (data.value[0]) {
                 setDadosXML({
                     ...dadosXML,
                     cpf_motorista: dadosCRLV.cpf_motorista.replace(/\D/g, ''),
                     nome_motorista: data.value[0].NOME,
                 })
-                veiculo.IDPROPVEICULO = data.value[0].IDCADASTRO
+
 
                 toast.info("Motorista já cadastrado")
 
@@ -226,7 +227,7 @@ export default function CRLVView() {
         veiculo.RENAVAN = dadosCRLV.renavam
         veiculo.TIPOPROPRIETARIO = "1"
         veiculo.TIPOCARROCERIA = dadosCRLV.tipoCarroceria
-        veiculo.TIPORODADO = dadosCRLV.tipoRodado
+        veiculo.IDGRUPOVEICULO = dadosCRLV.tipoRodado
         veiculo.TIPOVEICULO = dadosCRLV.tipoVeiculo
         veiculo.RNTC = dadosCRLV.rntc_veículo
 
@@ -236,7 +237,7 @@ export default function CRLVView() {
         }
 
         try {
-            const { data } = await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
+            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GveiculoApi/Post`,
                 veiculo,
                 {
                     headers: {
@@ -324,7 +325,6 @@ export default function CRLVView() {
                 return
             }
 
-
             setDadosXML({
                 ...dadosXML,
                 cpf_motorista: dadosCRLV.cpf_motorista.replace(/\D/g, ''),
@@ -336,11 +336,6 @@ export default function CRLVView() {
         }
     }
 
-    const processarTodos = async () => {
-        await verificarSeProprietarioTaCadastrado();
-        await verificarSeVeiculoTaCadastrado();
-        await verificarSeMotoristaTaCadastrado();
-    }
 
     const fieldClass = `
             w-full
@@ -369,10 +364,7 @@ export default function CRLVView() {
                             onClick={() => setDadosCRLV(null)}>
                             Limpar CRLV
                         </button>
-                        <button className="w-40 bg-orange-500 text-white px-4 py-2 rounded-lg"
-                            onClick={processarTodos}>
-                            Processar todos
-                        </button>
+
                     </div>
                     <div className="grid xl:grid-cols-3 gap-8">
                         {/* MOTORISTA */}

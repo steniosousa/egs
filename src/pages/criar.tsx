@@ -23,6 +23,7 @@ export default function CRIAR() {
             const dest = xmlDoc.querySelector("dest");
             const destination = xmlDoc.querySelector("enderDest");
             const emit = xmlDoc.querySelector("emit");
+
             const atualizacoes: Partial<XML> = {};
 
 
@@ -31,6 +32,10 @@ export default function CRIAR() {
                 if (cpfCnpjDest) {
                     const cpf = formatarCpfCnpj(cpfCnpjDest, 'destinatario');
                     atualizacoes.cpfCnpjDestinatario = cpf;
+                }
+                const inscEstadual = dest.querySelector("IE")?.textContent || "";
+                if (inscEstadual) {
+                    atualizacoes.INSCESTADUAL_destinatario = inscEstadual;
                 }
             }
 
@@ -233,7 +238,6 @@ export default function CRIAR() {
 
                 if (documento.length === 14) {
                     await getDadasCNPJ();
-                    await createDestinatário();
                     return;
                 }
                 setDestinatarioNaoEncontrado(true)
@@ -340,7 +344,6 @@ export default function CRIAR() {
             });
 
             toast.info('CT-e enviado com sucesso!');
-
         } catch (error) {
             toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
         }
@@ -358,29 +361,33 @@ export default function CRIAR() {
                         Authorization: `Bearer ${empresa.token}`
                     }
                 })
-            setDadosXML({
-                ...dadosXML,
-                email_destinatario: data.Email,
-                fone_destinatario: data.Telefone,
-                nome_destinatario: data.Nome,
-                nome_fantasia: data.Fantasia,
-                cep_destinatario: data.Cep,
-                rua_destinatario: data.Logradouro,
-                bairro_destinario: data.Bairro,
-                numero_endereco_destinatario: data.Numero,
-                complemente_destinatario: data.Complemento,
-                cidade_estado_destinatario: data.CIDADEESTADO,
-                CODCIDADE: data.CODCIDADE,
-                Uf_destinatario: data.Uf
-            });
 
+            const codCidade = await axios.get(`https://api.egssistemas.com.br/EGSAPP4//api/ComboBox/GCIDADE?search=${data.CIDADEESTADO.split(' - ')[0]}`, {
+                headers: {
+                    Authorization: `Bearer ${empresa.token}`
+                }
+            })
+
+            await createDestinatário({
+                email: data.email,
+                telefone: data.Telefone,
+                nome: data.Nome,
+                endereco: data.Logradouro,
+                bairro: data.Bairro,
+                numero: data.Numero,
+                complemento: data.Complemento,
+                cep: data.Cep,
+                cidade: data.CIDADEESTADO,
+                uf: data.Uf,
+                CODCIDADE:codCidade.data[0].CODMUNICIPIO
+            })
         } catch (error) {
             console.error(error)
             toast.error("Erro ao buscar dados do CNPJ")
         }
     }
 
-    const createDestinatário = async () => {
+    const createDestinatário = async ({ email, telefone, nome, endereco, bairro, numero, complemento, cep, cidade, uf, CODCIDADE}: { email: string, telefone: string, nome: string, endereco: string, bairro: string, numero: string, complemento: string, cep: string, cidade: string, uf: string, CODCIDADE: string }) => {
         if (!empresa) {
             toast.error("Empresa nao selecionada")
             return
@@ -388,21 +395,23 @@ export default function CRIAR() {
         try {
             const { data } = await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
                 {
-                    RAZAOSOCIAL: dadosXML.nome_destinatario,
-                    NOME: dadosXML.nome_destinatario,
+                    RAZAOSOCIAL: nome,
+                    NOME: nome,
                     CPFCNPJ: dadosXML.cpfCnpjDestinatario.replace(/\D/g, ''),
-                    CONSUMIDORFINAL: "1",
-                    CONTRIBUINTEICMS: "9",
-                    FONE: dadosXML.fone_destinatario,
-                    EMAIL: dadosXML.email_destinatario,
-                    EMAILNFE: dadosXML.email_destinatario,
-                    ENDERECO: dadosXML.rua_destinatario,
-                    BAIRRO: dadosXML.bairro_destinario,
-                    NUMERO: dadosXML.numero_endereco_destinatario,
-                    CEP: dadosXML.cep_destinatario,
-                    CODCIDADE: dadosXML.CODCIDADE,
-                    CODESTADO: dadosXML.Uf_destinatario,
+                    CONSUMIDORFINAL: "0",
+                    CONTRIBUINTEICMS: "1",
+                    FONE: telefone,
+                    EMAIL: email,
+                    EMAILNFE: email,
+                    ENDERECO: endereco,
+                    BAIRRO: bairro,
+                    NUMERO: numero,
+                    CEP: cep,
+                    CODESTADO: uf,
                     CODPAIS: "1058",
+                    INSCESTADUAL: dadosXML.INSCESTADUAL_destinatario,
+                    CODCIDADE: CODCIDADE,
+                    COMPLEMENTO:complemento
                 },
                 {
                     headers: {
@@ -652,20 +661,6 @@ export default function CRIAR() {
                                                         />
                                                     </div>
 
-                                                </div>
-
-                                                <div className="flex justify-end border-t pt-5">
-                                                    <button onClick={getDadasCNPJ} type="button"
-                                                        className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-6 py-3 font-medium text-white shadow-md transition-all hover:bg-orange-700 hover:shadow-lg active:scale-95"
-                                                    >Buscar por CNPJ</button>
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={createDestinatário}
-                                                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg active:scale-95"
-                                                    >
-                                                        Criar Destinatário
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -997,6 +992,19 @@ export default function CRIAR() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                             </svg>
                             Enviar CT-e
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => getDadasCNPJ()}
+                        className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
+                    >
+                        <span className="flex items-center">
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                            Cdastrar
                         </span>
                     </button>
                 </div>

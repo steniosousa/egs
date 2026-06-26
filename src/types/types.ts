@@ -18,18 +18,19 @@ export interface XML {
     valorICMS: string,
     saida: { city: string, uf: string },
     destino: { city: string, uf: string },
-    fone_destinatario:string
-    cidade_destinatario:string
-    email_destinatario:string,
-    nome_fantasia:string
-    cep_destinatario:string
-    rua_destinatario:string
-    bairro_destinario:string
-    numero_endereco_destinatario:string
-    complemente_destinatario:string
-    cidade_estado_destinatario:string,
-    CODCIDADE:number,
-    Uf_destinatario:string,
+    fone_destinatario: string
+    cidade_destinatario: string
+    email_destinatario: string,
+    nome_fantasia: string
+    cep_destinatario: string
+    rua_destinatario: string
+    bairro_destinario: string
+    numero_endereco_destinatario: string
+    complemente_destinatario: string
+    cidade_estado_destinatario: string,
+    CODCIDADE: number,
+    Uf_destinatario: string,
+    INSCESTADUAL_destinatario: string
 }
 
 
@@ -85,11 +86,11 @@ export interface CTE {
     "PESOKG": number//13700,
     "PLACATRACAO": "MCD0615",
     "DOCNFE": {
-            "IDENT": number,
-            "IDCTE": number,
-            "CHAVENFE": string,
-            "NNF": string
-        }[]
+        "IDENT": number,
+        "IDCTE": number,
+        "CHAVENFE": string,
+        "NNF": string
+    }[]
     ,
     "CARGAQTD": [
         {
