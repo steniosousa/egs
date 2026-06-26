@@ -143,14 +143,15 @@ export default function CRIAR() {
         try {
             if (!empresa) {
                 toast.error("Empresa não encontrada")
-                return
+                throw new Error("Empresa não encontrada")
             }
 
             const atualizacoes: Partial<CTE> = { ...cteSelecionado };
 
             if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
                 toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
-                return
+                throw new Error("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
+
             }
 
             const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
@@ -200,6 +201,8 @@ export default function CRIAR() {
                 setDadosXML({ ...dadosXML, nome_motorista: Motorista.data[0].NOME })
             } else {
                 toast.info("Motorista não encontrado")
+                throw new Error("Motorista não encontrado")
+
             }
 
 
@@ -212,6 +215,8 @@ export default function CRIAR() {
                 setDadosXML({ ...dadosXML, nome_remetente: Remetente.data[0].NOME })
             } else {
                 toast.info("Remetente não encontrado")
+                throw new Error("Remetente não encontrado")
+
             }
 
             if (destinatario.data[0]) {
@@ -232,6 +237,7 @@ export default function CRIAR() {
                     return;
                 }
                 setDestinatarioNaoEncontrado(true)
+                throw new Error("Destinatário não encontrado")
             }
             if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
                 atualizacoes.Veiculos[0] = {
@@ -258,6 +264,7 @@ export default function CRIAR() {
                 setDadosXML({ ...dadosXML, nome_veiculo: VeiculoTração.data[0].DESCRICAO })
             } else {
                 toast.info("Veículo não encontrado")
+                throw new Error("Veículo não encontrado")
             }
 
 
@@ -312,6 +319,7 @@ export default function CRIAR() {
         }
         catch (error) {
             toast.error("Erro ao carregar dados")
+            throw error;
         }
     }
 
@@ -323,6 +331,7 @@ export default function CRIAR() {
         }
         try {
 
+            await loadingData()
             await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
                 headers: {
                     'Authorization': 'Bearer ' + empresa.token,
@@ -977,18 +986,7 @@ export default function CRIAR() {
 
 
                 <div className="flex justify-center p-6 gap-2">
-                    <button
-                        type="button"
-                        onClick={() => loadingData()}
-                        className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
-                    >
-                        <span className="flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Buscar Informações
-                        </span>
-                    </button>
+
                     <button
                         type="button"
                         onClick={() => sendData()}
