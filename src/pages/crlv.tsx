@@ -230,6 +230,7 @@ export default function CRLVView() {
         veiculo.IDGRUPOVEICULO = dadosCRLV.tipoRodado
         veiculo.TIPOVEICULO = dadosCRLV.tipoVeiculo
         veiculo.RNTC = dadosCRLV.rntc_veículo
+        veiculo.OBSVEICMOTVEIC = `Veiculo: ${dadosCRLV.placa}\nMotorista: ${dadosCRLV.nome_motorista}` as string
 
         if (!dadosCRLV.placa || !dadosCRLV.capacidade || !dadosCRLV.peso || !dadosCRLV.local || !dadosCRLV.modelo || !dadosCRLV.renavam || !dadosCRLV.tipoCarroceria || !dadosCRLV.tipoVeiculo || !dadosCRLV.rntc_veículo) {
             toast.error("INFORME A PLACA, CAPACIDADE, PESO, LOCAL, MODELO, RENAVAM, TIPO DE PROPRIETÁRIO, TIPO DE CARROCERIA, TIPO DE VEÍCULO E RNTC")

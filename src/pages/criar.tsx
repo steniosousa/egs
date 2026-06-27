@@ -10,8 +10,11 @@ export default function CRIAR() {
     const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
     const [destinatarioNaoEncontrado, setDestinatarioNaoEncontrado] = useState(false)
     const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
-
-
+    const [driverName, setDriverName] = useState('')
+    const [rementName, setRemetenteName] = useState("")
+    const [destName, setDestName] = useState("")
+    const [veicName, setVeicName] = useState("")
+    
     const processarXML = (xmlContent: string) => {
         try {
             const parser = new DOMParser();
@@ -155,8 +158,7 @@ export default function CRIAR() {
 
             if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
                 toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
-                throw new Error("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
-
+                return
             }
 
             const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
@@ -203,7 +205,8 @@ export default function CRIAR() {
 
             if (Motorista.data[0]) {
                 atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
-                setDadosXML({ ...dadosXML, nome_motorista: Motorista.data[0].NOME })
+                console.log(Motorista.data[0].NOME)
+                setDriverName(Motorista.data[0].NOME)
             } else {
                 toast.info("Motorista não encontrado")
                 throw new Error("Motorista não encontrado")
@@ -217,7 +220,7 @@ export default function CRIAR() {
                 atualizacoes.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
                 atualizacoes.UFFIMSERV = Remetente.data[0].CODESTADO;
                 atualizacoes.IDREMETENTE = Remetente.data[0].IDCADASTRO
-                setDadosXML({ ...dadosXML, nome_remetente: Remetente.data[0].NOME })
+                setRemetenteName(Remetente.data[0].NOME)
             } else {
                 toast.info("Remetente não encontrado")
                 throw new Error("Remetente não encontrado")
@@ -231,16 +234,16 @@ export default function CRIAR() {
                 atualizacoes.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
                 atualizacoes.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
                 atualizacoes.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
-                setDadosXML({ ...dadosXML, nome_destinatario: destinatario.data[0].NOME })
+                setDestName(destinatario.data[0].NOME)
             } else {
                 toast.info("Destinatário não encontrado")
                 const documento = dadosXML.cpfCnpjDestinatario.replace(/\D/g, "");
 
+                setDestinatarioNaoEncontrado(true)
                 if (documento.length === 14) {
                     await getDadasCNPJ();
                     return;
                 }
-                setDestinatarioNaoEncontrado(true)
                 throw new Error("Destinatário não encontrado")
             }
             if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
@@ -264,8 +267,10 @@ export default function CRIAR() {
                     UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
                     IDVEICULO: VeiculoTração.data[0].IDVEICULO,
                 }
+                atualizacoes.OBSVEICMOTVEIC = `Veiculo: ${VeiculoTração.data[0].PLACA}\nMotorista: ${VeiculoTração.data[0].NOMEPROPRIETARIO}` as string
+
                 atualizacoes.IDVEICULO = VeiculoTração.data[0].IDVEICULO
-                setDadosXML({ ...dadosXML, nome_veiculo: VeiculoTração.data[0].DESCRICAO })
+                setVeicName(VeiculoTração.data[0].DESCRICAO)
             } else {
                 toast.info("Veículo não encontrado")
                 throw new Error("Veículo não encontrado")
@@ -335,7 +340,6 @@ export default function CRIAR() {
         }
         try {
 
-            await loadingData()
             await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
                 headers: {
                     'Authorization': 'Bearer ' + empresa.token,
@@ -354,6 +358,8 @@ export default function CRIAR() {
             toast.error("Empresa não selecionada")
             return
         }
+
+
         try {
             const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/Sistema/GetCadastroReceiraFederal?CNPJ=${dadosXML.cpfCnpjDestinatario.replace(/\D/g, '')}`,
                 {
@@ -361,6 +367,7 @@ export default function CRIAR() {
                         Authorization: `Bearer ${empresa.token}`
                     }
                 })
+
 
             const codCidade = await axios.get(`https://api.egssistemas.com.br/EGSAPP4//api/ComboBox/GCIDADE?search=${data.CIDADEESTADO.split(' - ')[0]}`, {
                 headers: {
@@ -379,7 +386,7 @@ export default function CRIAR() {
                 cep: data.Cep,
                 cidade: data.CIDADEESTADO,
                 uf: data.Uf,
-                CODCIDADE:codCidade.data[0].CODMUNICIPIO
+                CODCIDADE: codCidade.data[0].CODMUNICIPIO
             })
         } catch (error) {
             console.error(error)
@@ -387,7 +394,7 @@ export default function CRIAR() {
         }
     }
 
-    const createDestinatário = async ({ email, telefone, nome, endereco, bairro, numero, complemento, cep, cidade, uf, CODCIDADE}: { email: string, telefone: string, nome: string, endereco: string, bairro: string, numero: string, complemento: string, cep: string, cidade: string, uf: string, CODCIDADE: string }) => {
+    const createDestinatário = async ({ email, telefone, nome, endereco, bairro, numero, complemento, cep, cidade, uf, CODCIDADE }: { email: string, telefone: string, nome: string, endereco: string, bairro: string, numero: string, complemento: string, cep: string, cidade: string, uf: string, CODCIDADE: string }) => {
         if (!empresa) {
             toast.error("Empresa nao selecionada")
             return
@@ -411,7 +418,7 @@ export default function CRIAR() {
                     CODPAIS: "1058",
                     INSCESTADUAL: dadosXML.INSCESTADUAL_destinatario,
                     CODCIDADE: CODCIDADE,
-                    COMPLEMENTO:complemento
+                    COMPLEMENTO: complemento
                 },
                 {
                     headers: {
@@ -552,7 +559,7 @@ export default function CRIAR() {
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="00.000.000/0000-00"
                                     />
-                                    <span className="text-sm text-gray-500">{dadosXML.nome_remetente}</span>
+                                    <span className="text-sm text-gray-500">{rementName}</span>
                                 </div>
                                 <div className="space-y-2">
                                     <label htmlFor="destinatario" className="block text-sm font-semibold text-gray-700 flex items-center">
@@ -573,7 +580,7 @@ export default function CRIAR() {
                                         placeholder="00.000.000/0000-00"
                                     />
 
-                                    <span className="text-sm text-gray-500">{dadosXML.nome_destinatario}</span>
+                                    <span className="text-sm text-gray-500">{destName}</span>
 
                                     {destinatarioNaoEncontrado && (
                                         <div className="mt-6 rounded-2xl border border-amber-200 bg-white shadow-lg overflow-hidden">
@@ -770,7 +777,7 @@ export default function CRIAR() {
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="ABC-1234"
                                     />
-                                    <span className="text-sm text-gray-500">{dadosXML.nome_veiculo}</span>
+                                    <span className="text-sm text-gray-500">{veicName}</span>
                                 </div>
                                 <div className="space-y-2">
                                     <label htmlFor="proprietario" className="block text-sm font-semibold text-gray-700 flex items-center">
@@ -790,7 +797,7 @@ export default function CRIAR() {
                                         className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
                                         placeholder="000.000.000-00"
                                     />
-                                    <span className="text-sm text-gray-500">{dadosXML.nome_motorista}</span>
+                                    <span className="text-sm text-gray-500">{driverName}</span>
                                 </div>
                             </div>
                         </div>
@@ -981,7 +988,18 @@ export default function CRIAR() {
 
 
                 <div className="flex justify-center p-6 gap-2">
-
+ <button
+                        type="button"
+                        onClick={() => loadingData()}
+                        className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
+                    >
+                        <span className="flex items-center">
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                            Processar 
+                        </span>
+                    </button>
                     <button
                         type="button"
                         onClick={() => sendData()}
@@ -995,18 +1013,7 @@ export default function CRIAR() {
                         </span>
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={() => getDadasCNPJ()}
-                        className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
-                    >
-                        <span className="flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                            Cdastrar
-                        </span>
-                    </button>
+                   
                 </div>
             </form>
         </div>

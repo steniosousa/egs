@@ -105,6 +105,7 @@ export let veiculo = {
     "IDMOTORISTA": null,
     "MOTORISTA": null,
     "IDGRUPOVEICULO": "03",
+    "OBSVEICMOTVEIC": "",
     "DATAPESAGEM": null,
     "PROPRIO": false,
     "TIPOVEICULO": "R",
