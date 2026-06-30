@@ -12,9 +12,9 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
     tipoCaminhao = '14';
   } else if (quantidadeCarga >= 19000 && quantidadeCarga < 27000) {
     tipoCaminhao = '19';
-  } else if (quantidadeCarga >= 27000 && quantidadeCarga < 31980) {
+  } else if (quantidadeCarga >= 27000 && quantidadeCarga < 31900) {
     tipoCaminhao = '27_30';
-  } else if (quantidadeCarga >= 31980 && quantidadeCarga < 38000) {
+  } else if (quantidadeCarga >= 31900 && quantidadeCarga < 38000) {
     tipoCaminhao = '32_35';
   } else if (quantidadeCarga >= 38000 && quantidadeCarga < 50000) {
     tipoCaminhao = '38_40';
@@ -49,7 +49,7 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
   }
 
   const valorTabelaArredondado = Number(valorTabela.toFixed(2));
-
+  console.log({ valorTabelaArredondado, cargaEmKg, valorTabela, quantidadeCarga })
   return {
     valorDoServiço: parseFloat((valorTabelaArredondado * cargaEmKg).toFixed(2)),
   }

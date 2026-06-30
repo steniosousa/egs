@@ -14,7 +14,8 @@ export default function CRIAR() {
     const [rementName, setRemetenteName] = useState("")
     const [destName, setDestName] = useState("")
     const [veicName, setVeicName] = useState("")
-    
+    const atualizacoes: Partial<XML> = {};
+
     const processarXML = (xmlContent: string) => {
         try {
             const parser = new DOMParser();
@@ -27,7 +28,6 @@ export default function CRIAR() {
             const destination = xmlDoc.querySelector("enderDest");
             const emit = xmlDoc.querySelector("emit");
 
-            const atualizacoes: Partial<XML> = {};
 
 
             if (dest) {
@@ -107,22 +107,10 @@ export default function CRIAR() {
                     return
                 }
 
+                calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
 
-                atualizacoes.valorServico = serviço.valorDoServiço
-                atualizacoes.valorIBS = (serviço.valorDoServiço * 0.001).toFixed(2).toString()
-                atualizacoes.percentualCBS = (serviço.valorDoServiço * 0.009).toFixed(2).toString()
-                atualizacoes.valorICMS = (serviço.valorDoServiço * 0.12).toFixed(2).toString()
-                atualizacoes.saida = {
-                    city: saidaCidade,
-                    uf: saidaUF
-                };
-                atualizacoes.destino = {
-                    city: destinoCidade,
-                    uf: destinoUF
-                };
             }
 
-            setDadosXML({ ...dadosXML, ...atualizacoes });
 
         } catch (error) {
             toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
@@ -130,6 +118,23 @@ export default function CRIAR() {
 
 
     };
+
+    const calcularPorcentagens = ({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF }: { serviço: { valorDoServiço: number }, saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string }) => {
+        atualizacoes.valorServico = serviço.valorDoServiço
+        // atualizacoes.valorIBS = (serviço.valorDoServiço * 0.001).toFixed(2).toString()
+        // atualizacoes.percentualCBS = (serviço.valorDoServiço * 0.009).toFixed(2).toString()
+        atualizacoes.valorICMS = (serviço.valorDoServiço * 0.12).toFixed(2).toString()
+        atualizacoes.saida = {
+            city: saidaCidade,
+            uf: saidaUF
+        };
+        atualizacoes.destino = {
+            city: destinoCidade,
+            uf: destinoUF
+        };
+        setDadosXML({ ...dadosXML, ...atualizacoes });
+
+    }
 
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,7 +210,6 @@ export default function CRIAR() {
 
             if (Motorista.data[0]) {
                 atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
-                console.log(Motorista.data[0].NOME)
                 setDriverName(Motorista.data[0].NOME)
             } else {
                 toast.info("Motorista não encontrado")
@@ -988,7 +992,7 @@ export default function CRIAR() {
 
 
                 <div className="flex justify-center p-6 gap-2">
- <button
+                    <button
                         type="button"
                         onClick={() => loadingData()}
                         className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
@@ -997,7 +1001,7 @@ export default function CRIAR() {
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                             </svg>
-                            Processar 
+                            Processar
                         </span>
                     </button>
                     <button
@@ -1013,7 +1017,7 @@ export default function CRIAR() {
                         </span>
                     </button>
 
-                   
+
                 </div>
             </form>
         </div>
