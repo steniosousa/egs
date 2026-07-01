@@ -4,7 +4,9 @@ let tabelaData = null;
 
 export const carregarTabela = async () => {
   try {
-    const response = await fetch('/TABELA MATRIZ.xlsx');
+    const filePath = 'TABELA MATRIZ.xlsx';
+    const url = process.env.PUBLIC_URL ? `${process.env.PUBLIC_URL}/${filePath}` : `/${filePath}`;
+    const response = await fetch(encodeURI(url));
     
     if (!response.ok) {
       throw new Error(`Erro ao carregar arquivo: ${response.status} ${response.statusText}`);
