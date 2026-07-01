@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { carregarTabela } from "./tabelaMatrix";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -9,12 +9,12 @@ import CTEView from "./pages/cte";
 import CRIAR from "./pages/criar";
 
 function AppContent() {
-  const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading, setLoading,dadosCRLV } = useApp();
+  const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading, setLoading } = useApp();
   const token = localStorage.getItem('token');
   const [tab, setTab] = useState<'crlv' | 'xml'>('crlv');
   const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
 
-  const getCTES = async () => {
+  const getCTES = useCallback(async () => {
     if (!empresa) {
       toast.error("Empresa não selecionada")
       return
@@ -32,7 +32,7 @@ function AppContent() {
     } catch (e) {
       toast.error("Erro ao recuperar CTES")
     }
-  }
+  }, [empresa])
 
   const buscarCteEscolhida = async (id: string) => {
     if (!empresa) {
@@ -84,7 +84,7 @@ function AppContent() {
     if (empresa && empresa.name && tab === 'xml') {
       getCTES()
     }
-  }, [empresa, tab])
+  }, [empresa, tab, getCTES])
 
   useEffect(() => {
     const loadTabela = async () => {
@@ -101,7 +101,7 @@ function AppContent() {
     };
 
     loadTabela();
-  }, []);
+  }, [setLoading]);
 
 
   return (
