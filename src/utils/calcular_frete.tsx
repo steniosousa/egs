@@ -44,7 +44,7 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
   }
 
   if (!valorTabela || valorTabela === 0) {
-    console.log(tipoCaminhao, cargaEmKg)
+    console.log(`Valor do frete não encontrado para ${destino.city}/${destino.uf} com caminhão de ${tipoCaminhao} toneladas`)
     toast.error(`Valor do frete não encontrado para ${destino.city}/${destino.uf} com caminhão de ${tipoCaminhao} toneladas`)
     return
   }

@@ -16,7 +16,7 @@ export default function CRIAR() {
     const [veicName, setVeicName] = useState("")
     const [moreOneNota, setMoreOneNota] = useState(false)
     const [notasCarregadas, setNotasCarregadas] = useState<string[]>([])
-    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number }[]>([])
+    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number, saida: { city: string, uf: string } }[]>([])
     const atualizacoes: Partial<XML> = {};
 
     const processarXML = (xmlContent: string) => {
@@ -114,7 +114,7 @@ export default function CRIAR() {
                         return total + peso;
                     }, 0);
 
-                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga }]);
+                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga, saida: { city: saidaCidade, uf: saidaUF } }]);
                     setDadosXML({ ...dadosXML, ...atualizacoes });
                 } else {
                     calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
@@ -132,21 +132,21 @@ export default function CRIAR() {
         let pesoTotal = 0;
         let valorTotalCarga = 0;
 
-        console.log(dadosDeNotasCarregadas, "dadosDeNotasCarregadas")
         dadosDeNotasCarregadas.forEach((nota) => {
             pesoTotal += nota.peso;
             valorTotalCarga += nota.valorCarga;
         })
+
+        console.log("peso total", pesoTotal, "valor total carga", valorTotalCarga)
         const serviço = calcularFrete({
             city: dadosXML.saida.city,
             uf: dadosXML.saida.uf
         }, {
-            city: dadosXML.destino.city,
-            uf: dadosXML.destino.uf
+            city: dadosDeNotasCarregadas[0].saida.city,
+            uf: dadosDeNotasCarregadas[0].saida.uf
         }, Number(pesoTotal))
         if (!serviço) return
 
-        console.log(serviço, "serviço", pesoTotal, "peso")
         atualizacoes.valorCarga = valorTotalCarga.toString();
 
         atualizacoes.quantidadeCarga = pesoTotal.toString();
