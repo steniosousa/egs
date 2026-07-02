@@ -11,8 +11,10 @@ export interface XML {
     nome_veiculo: string,
     nome_remetente: string,
     nome_destinatario: string,
-    numeroNotaFiscal: string,
-    chaveNotaFiscal: string,
+    DOCNFE: {
+        "chaveNotaFiscal": string,
+        "numeroNotaFiscal": string
+    }[]
     percentualCBS: string,
     valorIBS: string,
     valorICMS: string,
@@ -86,8 +88,6 @@ export interface CTE {
     "PESOKG": number//13700,
     "PLACATRACAO": "MCD0615",
     "DOCNFE": {
-        "IDENT": number,
-        "IDCTE": number,
         "CHAVENFE": string,
         "NNF": string
     }[]

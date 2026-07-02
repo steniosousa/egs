@@ -4,7 +4,7 @@ import { formatarCpfCnpj } from "../utils/format";
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { CTE, XML } from "../types/types";
-import calcularFrete from "../utils/calcular_frete";
+import calcularFrete, { pegarTipoDeCaminhao } from "../utils/calcular_frete";
 
 export default function CRIAR() {
     const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
@@ -16,7 +16,8 @@ export default function CRIAR() {
     const [veicName, setVeicName] = useState("")
     const [moreOneNota, setMoreOneNota] = useState(false)
     const [notasCarregadas, setNotasCarregadas] = useState<string[]>([])
-    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number, saida: { city: string, uf: string } }[]>([])
+    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number, destino: { city: string, uf: string } }[]>([])
+    const [tipoVeiculo, setTipoVeiculo] = useState<'14' | '19' | '27_30' | '32_35' | '38_40' | '50'>('50')
     const atualizacoes: Partial<XML> = {};
 
     const processarXML = (xmlContent: string) => {
@@ -52,10 +53,34 @@ export default function CRIAR() {
             }
 
             if (ide) {
-                const nNF = ide.querySelector("nNF")?.textContent || "";
-                const chave = xmlDoc.querySelector("infNFe")?.getAttribute("Id")?.replace("NFe", "") || "";
-                atualizacoes.numeroNotaFiscal = nNF;
-                atualizacoes.chaveNotaFiscal = chave;
+                const nNF = (ide.querySelector("nNF")?.textContent || "").trim();
+
+                const chave = (
+                    xmlDoc
+                        .querySelector("infNFe")
+                        ?.getAttribute("Id")
+                        ?.replace("NFe", "") || ""
+                ).trim();
+
+                if (!atualizacoes.DOCNFE) {
+                    atualizacoes.DOCNFE = [];
+                }
+
+
+                const existe = atualizacoes.DOCNFE.some(
+                    x => (x.chaveNotaFiscal || "").trim() === chave
+                );
+
+
+
+                if (!existe) {
+                    console.log("Adicionando", chave);
+
+                    atualizacoes.DOCNFE.push({
+                        chaveNotaFiscal: chave,
+                        numeroNotaFiscal: nNF
+                    });
+                }
             }
 
             if (vol) {
@@ -81,7 +106,8 @@ export default function CRIAR() {
                     return total + peso;
                 }, 0);
 
-
+                const tipoVeiculo = pegarTipoDeCaminhao(pesoTotal);
+                setTipoVeiculo(tipoVeiculo);
                 atualizacoes.quantidadeCarga = pesoTotal.toString();
             }
 
@@ -90,21 +116,17 @@ export default function CRIAR() {
             const destinoCidade = destination?.querySelector("xMun")?.textContent || "";
             const destinoUF = destination?.querySelector("UF")?.textContent || "";
 
-            if (saidaCidade && destinoCidade && saidaUF && destinoUF) {
-                const serviço = calcularFrete({
-                    city: saidaCidade,
-                    uf: saidaUF
-                }, {
-                    city: destinoCidade,
-                    uf: destinoUF
-                }, Number(atualizacoes.quantidadeCarga))
+            atualizacoes.saida = {
+                city: saidaCidade,
+                uf: saidaUF
+            }
+            atualizacoes.destino = {
+                city: destinoCidade,
+                uf: destinoUF
+            }
 
-                if (!serviço) {
-                    toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
-                    return
-                }
+            if (saidaCidade && destinoCidade && saidaUF && destinoUF) {
                 if (moreOneNota) {
-                    console.log(serviço, "serviço", atualizacoes.quantidadeCarga, "peso")
                     const volumes = xmlDoc.querySelectorAll("vol");
                     const pesoTotal = Array.from(volumes).reduce((total, vol) => {
                         const peso = parseFloat(
@@ -114,10 +136,10 @@ export default function CRIAR() {
                         return total + peso;
                     }, 0);
 
-                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga, saida: { city: saidaCidade, uf: saidaUF } }]);
+                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga, destino: { city: destinoCidade, uf: destinoUF } }]);
                     setDadosXML({ ...dadosXML, ...atualizacoes });
                 } else {
-                    calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
+                    calcularAposEscolherVipoDeCaminha(saidaCidade, saidaUF, destinoCidade, destinoUF, Number(atualizacoes.quantidadeCarga))
                 }
 
             }
@@ -128,6 +150,25 @@ export default function CRIAR() {
         }
     };
 
+    const calcularAposEscolherVipoDeCaminha = (saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string, quantidadeCarga: number, tipoVeiculo?: string) => {
+
+        setTipoVeiculo(tipoVeiculo as '14' | '19' | '27_30' | '32_35' | '38_40' | '50');
+
+        const serviço = calcularFrete({
+            city: saidaCidade,
+            uf: saidaUF
+        }, {
+            city: destinoCidade,
+            uf: destinoUF
+        }, quantidadeCarga, tipoVeiculo as '14' | '19' | '27_30' | '32_35' | '38_40' | '50' || tipoVeiculo || '50')
+        if (!serviço) {
+            toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
+            return
+        }
+
+        calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
+    }
+
     const somarValoresMaisDeUmaNota = () => {
         let pesoTotal = 0;
         let valorTotalCarga = 0;
@@ -137,19 +178,22 @@ export default function CRIAR() {
             valorTotalCarga += nota.valorCarga;
         })
 
-        console.log("peso total", pesoTotal, "valor total carga", valorTotalCarga)
-        const serviço = calcularFrete({
-            city: dadosXML.saida.city,
-            uf: dadosXML.saida.uf
-        }, {
-            city: dadosDeNotasCarregadas[0].saida.city,
-            uf: dadosDeNotasCarregadas[0].saida.uf
-        }, Number(pesoTotal))
-        if (!serviço) return
-
         atualizacoes.valorCarga = valorTotalCarga.toString();
-
         atualizacoes.quantidadeCarga = pesoTotal.toString();
+        setDadosXML({ ...dadosXML, quantidadeCarga: pesoTotal.toString(), valorCarga: valorTotalCarga.toString() });
+
+        const serviço = calcularFrete({
+            city: dadosDeNotasCarregadas[0].destino.city,
+            uf: dadosDeNotasCarregadas[0].destino.uf
+        }, {
+            city: dadosDeNotasCarregadas[0].destino.city,
+            uf: dadosDeNotasCarregadas[0].destino.uf
+        }, Number(pesoTotal), tipoVeiculo)
+
+        if (!serviço) {
+            return
+        }
+
         calcularPorcentagens({ serviço: { valorDoServiço: serviço.valorDoServiço }, saidaCidade: dadosXML.saida.city, saidaUF: dadosXML.saida.uf, destinoCidade: dadosXML.destino.city, destinoUF: dadosXML.destino.uf })
         setDadosXML({ ...dadosXML, ...atualizacoes });
     }
@@ -167,6 +211,7 @@ export default function CRIAR() {
             city: destinoCidade,
             uf: destinoUF
         };
+
         setDadosXML({ ...dadosXML, ...atualizacoes });
 
     }
@@ -205,7 +250,10 @@ export default function CRIAR() {
     }
 
     const loadingData = async () => {
-
+        if (!tipoVeiculo) {
+            toast.error("Selecione o tipo de veículo para continuar")
+            return
+        }
         try {
             if (!empresa) {
                 toast.error("Empresa não encontrada")
@@ -332,13 +380,26 @@ export default function CRIAR() {
                 toast.info("Veículo não encontrado")
                 throw new Error("Veículo não encontrado")
             }
+            atualizacoes.DOCNFE = [];
+            console.log(dadosXML.DOCNFE)
+            dadosXML.DOCNFE.forEach((nota) => {
+                if (!atualizacoes.DOCNFE) {
+                    atualizacoes.DOCNFE = [];
+                }
 
+                const existe = atualizacoes.DOCNFE.some(
+                    n => n.CHAVENFE === nota.chaveNotaFiscal
+                );
+                console.log(existe)
 
-
-            if (atualizacoes.DOCNFE && atualizacoes.DOCNFE[0]) {
-                atualizacoes.DOCNFE[0].CHAVENFE = dadosXML.chaveNotaFiscal
-                atualizacoes.DOCNFE[0].NNF = dadosXML.numeroNotaFiscal
-            }
+                if (!existe) {
+                    atualizacoes.DOCNFE.push({
+                        CHAVENFE: nota.chaveNotaFiscal,
+                        NNF: nota.numeroNotaFiscal,
+                    });
+                }
+            });
+            console.log(atualizacoes.DOCNFE)
 
             const valorCargaCorrigido = Number(dadosXML.valorCarga)
             atualizacoes.VALORCARGA = valorCargaCorrigido
@@ -403,7 +464,9 @@ export default function CRIAR() {
                     'Content-Type': 'application/json'
                 }
             });
-
+            limparNotasCarregadas()
+            escolherOutraCTE()
+            console.log(cteSelecionado)
             toast.info('CT-e enviado com sucesso!');
         } catch (error) {
             toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
@@ -501,6 +564,10 @@ export default function CRIAR() {
         setMoreOneNota(false)
     }
 
+    const escolherOutraCTE = () => {
+        setCteSelecionado(null)
+    }
+
     if (!cteSelecionado) {
         return (
             <p> Carregando... </p>
@@ -509,6 +576,9 @@ export default function CRIAR() {
 
     return (
         <div>
+            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => escolherOutraCTE()}>
+                Escolher outro XML
+            </button>
             <div className="p-6">
                 <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
                     <div className="text-center">
@@ -530,24 +600,27 @@ export default function CRIAR() {
                                     name="xml-upload"
                                     type="file"
                                     accept=".xml"
+                                    multiple={false}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={handleFileUpload}
                                 />
                             </label>
                         </div>
-                        <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center">
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"  onClick={() => processarTodasNotas()}>
-                                Processar todas as notas carregadas
-                            </button>
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => somarValoresMaisDeUmaNota()}>
-                                Somar valores de todas as notas carregadas
-                            </button>
+                        {notasCarregadas.length > 0 && (
+                            <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center">
+                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => processarTodasNotas()} disabled={notasCarregadas.length === 0}>
+                                    Processar todas as notas carregadas
+                                </button>
+                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => somarValoresMaisDeUmaNota()} disabled={notasCarregadas.length === 0}>
+                                    Somar valores de todas as notas carregadas
+                                </button>
 
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} >
-                                Limpar Notas
-                            </button>
+                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} disabled={notasCarregadas.length === 0}>
+                                    Limpar Notas
+                                </button>
 
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -606,6 +679,21 @@ export default function CRIAR() {
                             </svg>
                             Reforma Tributária
                         </button>
+                        <select
+                            value={tipoVeiculo}
+                            onChange={(e) => {
+                                setTipoVeiculo(e.target.value as '14' | '19' | '27_30' | '32_35' | '38_40' | '50');
+                                calcularAposEscolherVipoDeCaminha(dadosXML.saida.city, dadosXML.saida.uf, dadosXML.destino.city, dadosXML.destino.uf, Number(dadosXML.quantidadeCarga), e.target.value)
+                            }}
+                            className="py-4 px-1 border-b-2 font-medium text-sm transition-colors border-transparent  hover:text-gray-700 hover:border-gray-300">
+                            <option disabled>Tipo de Veículo</option>
+                            <option value="14">14 TON</option>
+                            <option value="19">19 TON</option>
+                            <option value="27_30">27-30 TON</option>
+                            <option value="32_35">32-35 TON</option>
+                            <option value="38_40">38-40 TON</option>
+                            <option value="50">50 TON</option>
+                        </select>
                     </nav>
                 </div>
             </div>
@@ -921,46 +1009,58 @@ export default function CRIAR() {
                                 </svg>
                                 Documentos Fiscais
                             </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label htmlFor="numeroNotaFiscal" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                        </svg>
-                                        Número da Nota Fiscal
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.numeroNotaFiscal}
-                                        onChange={(e) => {
-                                            setDadosXML({ ...dadosXML, numeroNotaFiscal: e.target.value });
-                                        }}
-                                        id="numeroNotaFiscal"
-                                        name="numeroNotaFiscal"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="000000000"
-                                    />
+                            {dadosXML && dadosXML.DOCNFE.length > 0 && dadosXML.DOCNFE.map((doc, index) => (
+                                <div key={doc.chaveNotaFiscal || index} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2">
+                                        <label htmlFor={`numeroNotaFiscal-${index}`} className="block text-sm font-semibold text-gray-700 flex items-center">
+                                            <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            Número da Nota Fiscal
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={doc.numeroNotaFiscal}
+                                            onChange={(e) => {
+                                                setDadosXML({
+                                                    ...dadosXML,
+                                                    DOCNFE: dadosXML.DOCNFE.map((item, i) =>
+                                                        i === index ? { ...item, numeroNotaFiscal: e.target.value } : item
+                                                    )
+                                                });
+                                            }}
+                                            id={`numeroNotaFiscal-${index}`}
+                                            name={`numeroNotaFiscal-${index}`}
+                                            className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                            placeholder="000000000"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor={`chaveNotaFiscal-${index}`} className="block text-sm font-semibold text-gray-700 flex items-center">
+                                            <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                            </svg>
+                                            Chave da Nota Fiscal
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={doc.chaveNotaFiscal}
+                                            onChange={(e) => {
+                                                setDadosXML({
+                                                    ...dadosXML,
+                                                    DOCNFE: dadosXML.DOCNFE.map((item, i) =>
+                                                        i === index ? { ...item, chaveNotaFiscal: e.target.value } : item
+                                                    )
+                                                });
+                                            }}
+                                            id={`chaveNotaFiscal-${index}`}
+                                            name={`chaveNotaFiscal-${index}`}
+                                            className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                                            placeholder="Chave de 44 dígitos"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="chaveNotaFiscal" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-                                        </svg>
-                                        Chave da Nota Fiscal
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.chaveNotaFiscal}
-                                        onChange={(e) => {
-                                            setDadosXML({ ...dadosXML, chaveNotaFiscal: e.target.value });
-                                        }}
-                                        id="chaveNotaFiscal"
-                                        name="chaveNotaFiscal"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="Chave de 44 dígitos"
-                                    />
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                 )}

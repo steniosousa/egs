@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { toast } from 'react-toastify';
 
 let tabelaData = null;
 
@@ -46,6 +47,7 @@ export const buscarValor19Ton = (cidade, uf) => {
 };
 
 export const buscarValor27_30Ton = (cidade, uf) => {
+  console.log("entrou para o calculo")
   return buscarValorPorColuna(cidade, uf, '5 Eixos 27/30 TON');
 };
 
@@ -63,7 +65,10 @@ export const buscarValor50Ton = (cidade, uf) => {
 
 // Função para buscar usando os nomes das colunas (se tiver cabeçalho)
 export const buscarValorPorColuna = (cidade, uf, tipoCaminhao) => {
+  console.log("linhaEncontrada")
+
   if (!tabelaData) {
+    toast.error("Tabela de frete não carregada. Por favor, tente novamente mais tarde.");
     return null;
   }
   
