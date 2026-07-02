@@ -536,14 +536,14 @@ export default function CRIAR() {
                             </label>
                         </div>
                         <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center">
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" disabled={dadosDeNotasCarregadas.length === 0} onClick={() => processarTodasNotas()}>
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"  onClick={() => processarTodasNotas()}>
                                 Processar todas as notas carregadas
                             </button>
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" disabled={dadosDeNotasCarregadas.length === 0} onClick={() => somarValoresMaisDeUmaNota()}>
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => somarValoresMaisDeUmaNota()}>
                                 Somar valores de todas as notas carregadas
                             </button>
 
-                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} disabled={dadosDeNotasCarregadas.length === 0}>
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} >
                                 Limpar Notas
                             </button>
 
