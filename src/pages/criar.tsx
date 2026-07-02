@@ -14,6 +14,9 @@ export default function CRIAR() {
     const [rementName, setRemetenteName] = useState("")
     const [destName, setDestName] = useState("")
     const [veicName, setVeicName] = useState("")
+    const [moreOneNota, setMoreOneNota] = useState(false)
+    const [notasCarregadas, setNotasCarregadas] = useState<string[]>([])
+    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number }[]>([])
     const atualizacoes: Partial<XML> = {};
 
     const processarXML = (xmlContent: string) => {
@@ -27,8 +30,6 @@ export default function CRIAR() {
             const dest = xmlDoc.querySelector("dest");
             const destination = xmlDoc.querySelector("enderDest");
             const emit = xmlDoc.querySelector("emit");
-
-
 
             if (dest) {
                 const cpfCnpjDest = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
@@ -57,25 +58,21 @@ export default function CRIAR() {
                 atualizacoes.chaveNotaFiscal = chave;
             }
 
-            let produto = "";
             if (vol) {
-                produto = xmlDoc.querySelector("prod")?.querySelector("xProd")?.textContent?.split(' ')[0] || "";
-            }
-
-            if (produto) {
+                const produto = xmlDoc.querySelector("prod")?.querySelector("xProd")?.textContent?.split(' ')[0] || "";
                 atualizacoes.produtoPredominante = produto;
             }
 
+            let valorCarga = 0;
             if (icmsTot) {
                 const vNF = icmsTot.querySelector("vNF")?.textContent || "0";
                 atualizacoes.valorCarga = vNF;
-
+                valorCarga = parseFloat(vNF);
             }
 
 
             if (vol) {
                 const volumes = xmlDoc.querySelectorAll("vol");
-
                 const pesoTotal = Array.from(volumes).reduce((total, vol) => {
                     const peso = parseFloat(
                         vol.querySelector("pesoB")?.textContent || "0"
@@ -84,8 +81,8 @@ export default function CRIAR() {
                     return total + peso;
                 }, 0);
 
-                atualizacoes.quantidadeCarga = pesoTotal.toString();
 
+                atualizacoes.quantidadeCarga = pesoTotal.toString();
             }
 
             const saidaCidade = exit?.querySelector("xMun")?.textContent || "";
@@ -106,8 +103,22 @@ export default function CRIAR() {
                     toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
                     return
                 }
+                if (moreOneNota) {
+                    console.log(serviço, "serviço", atualizacoes.quantidadeCarga, "peso")
+                    const volumes = xmlDoc.querySelectorAll("vol");
+                    const pesoTotal = Array.from(volumes).reduce((total, vol) => {
+                        const peso = parseFloat(
+                            vol.querySelector("pesoB")?.textContent || "0"
+                        );
 
-                calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
+                        return total + peso;
+                    }, 0);
+
+                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga }]);
+                    setDadosXML({ ...dadosXML, ...atualizacoes });
+                } else {
+                    calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
+                }
 
             }
 
@@ -115,9 +126,33 @@ export default function CRIAR() {
         } catch (error) {
             toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
         }
-
-
     };
+
+    const somarValoresMaisDeUmaNota = () => {
+        let pesoTotal = 0;
+        let valorTotalCarga = 0;
+
+        console.log(dadosDeNotasCarregadas, "dadosDeNotasCarregadas")
+        dadosDeNotasCarregadas.forEach((nota) => {
+            pesoTotal += nota.peso;
+            valorTotalCarga += nota.valorCarga;
+        })
+        const serviço = calcularFrete({
+            city: dadosXML.saida.city,
+            uf: dadosXML.saida.uf
+        }, {
+            city: dadosXML.destino.city,
+            uf: dadosXML.destino.uf
+        }, Number(pesoTotal))
+        if (!serviço) return
+
+        console.log(serviço, "serviço", pesoTotal, "peso")
+        atualizacoes.valorCarga = valorTotalCarga.toString();
+
+        atualizacoes.quantidadeCarga = pesoTotal.toString();
+        calcularPorcentagens({ serviço: { valorDoServiço: serviço.valorDoServiço }, saidaCidade: dadosXML.saida.city, saidaUF: dadosXML.saida.uf, destinoCidade: dadosXML.destino.city, destinoUF: dadosXML.destino.uf })
+        setDadosXML({ ...dadosXML, ...atualizacoes });
+    }
 
     const calcularPorcentagens = ({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF }: { serviço: { valorDoServiço: number }, saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string }) => {
         atualizacoes.valorServico = serviço.valorDoServiço
@@ -143,6 +178,10 @@ export default function CRIAR() {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const xmlContent = e.target?.result as string;
+                if (moreOneNota) {
+                    setNotasCarregadas(prevNotas => [...prevNotas, xmlContent]);
+                    return;
+                }
                 processarXML(xmlContent);
             };
             reader.readAsText(file);
@@ -150,6 +189,20 @@ export default function CRIAR() {
             toast.error("Por favor, selecione um arquivo XML válido.");
         }
     };
+
+    const processarTodasNotas = () => {
+        if (notasCarregadas.length === 0) {
+            toast.error("Nenhuma nota carregada para processar.");
+            return;
+        }
+        if (notasCarregadas.some(xml => !xml || xml.trim() === "")) {
+            toast.error("Uma ou mais notas carregadas estão vazias. Verifique os arquivos XML.");
+            return;
+        }
+        notasCarregadas.forEach((e) => {
+            processarXML(notasCarregadas[notasCarregadas.indexOf(e)]);
+        });
+    }
 
     const loadingData = async () => {
 
@@ -441,21 +494,31 @@ export default function CRIAR() {
             toast.error("Erro ao criar destinatário")
         }
     }
+
+    const limparNotasCarregadas = () => {
+        setNotasCarregadas([]);
+        setDadosDeNotasCarregadas([])
+        setMoreOneNota(false)
+    }
+
     if (!cteSelecionado) {
         return (
-            <></>
+            <p> Carregando... </p>
         )
     }
 
     return (
-
         <div>
             <div className="p-6">
                 <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
                     <div className="text-center">
+                        <div>
+                            <p>Mais de 1 Nota</p>
+                            <input type="checkbox" checked={moreOneNota} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded h-5 w-5" onClick={() => setMoreOneNota(!moreOneNota)} >
+                            </input>
+                        </div>
                         <div className="border-t border-gray-200 pt-4">
                             <label htmlFor="xml-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
-
                                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                     <p className="mb-2 text-sm text-gray-600">
                                         <span className="font-semibold text-blue-600">Clique para selecionar</span> ou arraste o arquivo XML aqui
@@ -471,6 +534,19 @@ export default function CRIAR() {
                                     onChange={handleFileUpload}
                                 />
                             </label>
+                        </div>
+                        <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center">
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" disabled={dadosDeNotasCarregadas.length === 0} onClick={() => processarTodasNotas()}>
+                                Processar todas as notas carregadas
+                            </button>
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" disabled={dadosDeNotasCarregadas.length === 0} onClick={() => somarValoresMaisDeUmaNota()}>
+                                Somar valores de todas as notas carregadas
+                            </button>
+
+                            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} disabled={dadosDeNotasCarregadas.length === 0}>
+                                Limpar Notas
+                            </button>
+
                         </div>
                     </div>
                 </div>
@@ -955,7 +1031,6 @@ export default function CRIAR() {
                                         onChange={(e) => {
                                             const value = e.target.value.replace('%', '').replace(',', '.').trim();
                                             setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vCBS: parseFloat(value) || 0 } });
-
                                         }}
                                         id="percentualCBS"
                                         name="percentualCBS"

@@ -49,7 +49,6 @@ export default function calcularFrete(saida: { city: string, uf: string }, desti
   }
 
   const valorTabelaArredondado = Number(valorTabela.toFixed(2));
-  console.log({ valorTabelaArredondado, cargaEmKg, valorTabela, quantidadeCarga })
   return {
     valorDoServiço: parseFloat((valorTabelaArredondado * cargaEmKg).toFixed(2)),
   }

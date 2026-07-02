@@ -2,7 +2,6 @@ import axios from "axios";
 import { useCallback, useEffect, useState } from "react";
 import { carregarTabela } from "./tabelaMatrix";
 import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import CRLVView from "./pages/crlv";
 import { AppProvider, useApp } from "./context/AppContext";
 import CTEView from "./pages/cte";
