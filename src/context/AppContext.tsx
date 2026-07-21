@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { CRLV, CTE, XML } from '../types/types';
 import { toast } from 'react-toastify';
-import axios from 'axios';
+import { loginEmpresa, logoutEmpresa } from '../services/authService';
 
 interface AppContextType {
   empresa: {
@@ -110,32 +110,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         }
       }
 
-      const { data }: { data: { AUXTOKEN: string, URLAPI: string } } = await axios.get(`https://api.egssistemas.com.br/EGSWEB/api/Sistema/GetServerUrlByChaveAcessoV1?CHAVEACESSO=${url === "GADELOG" ? "2570123" : "50201"}&EGSERP=true`);
-      const params = new URLSearchParams();
-      params.append('auxtoken', data.AUXTOKEN);
-      params.append('captcha', '');
-      params.append('codigo2fa', '');
-      params.append('grant_type', 'password');
-      params.append('username', url === "GADELOG" ? "HENRIQUE" : 'FINANCEIRO');
-      params.append('password', url === "GADELOG" ? "291546" : 'inter2026');
-
-      const tokenData: { data: { access_token: string, token_type: string, expires_in: string } } = await axios.post(`https://api.egssistemas.com.br/${url === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
-        headers: {
-          authorization: url === "GADELOG" ? "Basic MjU3MDEyMzplZyR5c3RlbQ==" : 'Basic NTAyMDE6ZWckeXN0ZW0='
-        }
-      });
-
+      const tokenData = await loginEmpresa(url);
 
       localStorage.setItem('empresa', JSON.stringify({
-        token: tokenData.data.access_token,
+        token: tokenData.access_token,
         name: url === "GADELOG" ? "GADELOG" : "INTERMEDIUM",
-        expires_id: tokenData.data.expires_in,
+        expires_id: tokenData.expires_in,
         token_timestamp: Date.now().toString()
       }));
       setEmpresa({
-        token: tokenData.data.access_token,
+        token: tokenData.access_token,
         name: url === "GADELOG" ? "GADELOG" : "INTERMEDIUM",
-        expires_id: tokenData.data.expires_in,
+        expires_id: tokenData.expires_in,
         token_timestamp: Date.now().toString()
       });
     } catch (error) {
@@ -152,16 +138,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       return
     }
     try {
-      await axios.post(
-        `https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
-        null,
-        {
-          headers: {
-            Authorization: `Bearer ${empresa.token}`
-          },
-          withCredentials: true
-        }
-      );
+      await logoutEmpresa(empresa);
       limparDados()
       localStorage.clear()
     } catch {

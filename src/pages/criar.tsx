@@ -1,1200 +1,807 @@
-import axios from "axios";
-import { toast } from "react-toastify";
-import { formatarCpfCnpj } from "../utils/format";
 import { useState } from "react";
+import { toast } from "react-toastify";
+import {
+  FileCode2,
+  Landmark,
+  Package,
+  Percent,
+  RefreshCw,
+  Send,
+  Truck,
+  Users,
+} from "lucide-react";
+import { formatarCpfCnpj } from "../utils/format";
 import { useApp } from "../context/AppContext";
 import { CTE, XML } from "../types/types";
 import calcularFrete, { pegarTipoDeCaminhao } from "../utils/calcular_frete";
+import { parseNFeXml } from "../parsers/nfeXmlParser";
+import { comboBoxCadastro, comboBoxVeiculo, comboBoxCidade } from "../services/comboboxService";
+import { buscarCadastroReceitaFederal, criarCadastro } from "../services/cadastroService";
+import { salvarCte } from "../services/cteService";
+import { Button, Card, Input, Select, Tabs, TabItem } from "../components/ui";
+import { FileDropzone } from "../components/upload/FileDropzone";
+
+type TabKey = 'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária';
+
+const TABS: TabItem<TabKey>[] = [
+  { value: 'identificação', label: 'Identificação', icon: Users },
+  { value: 'Comp/Tributos', label: 'Componentes/Tributos', icon: Truck },
+  { value: 'documentos', label: 'Documentos', icon: FileCode2 },
+  { value: 'Reforma Tributária', label: 'Reforma Tributária', icon: Landmark },
+];
 
 export default function CRIAR() {
-    const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
-    const [destinatarioNaoEncontrado, setDestinatarioNaoEncontrado] = useState(false)
-    const [tab, setTab] = useState<'identificação' | 'Comp/Tributos' | 'documentos' | 'Reforma Tributária'>('identificação');
-    const [driverName, setDriverName] = useState('')
-    const [rementName, setRemetenteName] = useState("")
-    const [destName, setDestName] = useState("")
-    const [veicName, setVeicName] = useState("")
-    const [moreOneNota, setMoreOneNota] = useState(false)
-    const [notasCarregadas, setNotasCarregadas] = useState<string[]>([])
-    const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number, destino: { city: string, uf: string } }[]>([])
-    const [tipoVeiculo, setTipoVeiculo] = useState<'14' | '19' | '27_30' | '32_35' | '38_40' | '50'>('50')
-    const atualizacoes: Partial<XML> = {};
+  const { empresa, dadosXML, setDadosXML, cteSelecionado, setCteSelecionado } = useApp();
+  const [destinatarioNaoEncontrado, setDestinatarioNaoEncontrado] = useState(false)
+  const [tab, setTab] = useState<TabKey>('identificação');
+  const [driverName, setDriverName] = useState('')
+  const [rementName, setRemetenteName] = useState("")
+  const [destName, setDestName] = useState("")
+  const [veicName, setVeicName] = useState("")
+  const [moreOneNota, setMoreOneNota] = useState(false)
+  const [notasCarregadas, setNotasCarregadas] = useState<string[]>([])
+  const [dadosDeNotasCarregadas, setDadosDeNotasCarregadas] = useState<{ peso: number, valorCarga: number, destino: { city: string, uf: string } }[]>([])
+  const [tipoVeiculo, setTipoVeiculo] = useState<'14' | '19' | '27_30' | '32_35' | '38_40' | '50'>('50')
+  const [processando, setProcessando] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const atualizacoes: Partial<XML> = {};
 
-    const processarXML = (xmlContent: string) => {
-        try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlContent, "text/xml");
-            const icmsTot = xmlDoc.querySelector("ICMSTot");
-            const vol = xmlDoc.querySelector("vol");
-            const ide = xmlDoc.querySelector("ide");
-            const exit = xmlDoc.querySelector("enderEmit");
-            const dest = xmlDoc.querySelector("dest");
-            const destination = xmlDoc.querySelector("enderDest");
-            const emit = xmlDoc.querySelector("emit");
+  const processarXML = (xmlContent: string) => {
+    try {
+      const { basicos } = parseNFeXml(xmlContent);
 
-            if (dest) {
-                const cpfCnpjDest = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
-                if (cpfCnpjDest) {
-                    const cpf = formatarCpfCnpj(cpfCnpjDest, 'destinatario');
-                    atualizacoes.cpfCnpjDestinatario = cpf;
-                }
-                const inscEstadual = dest.querySelector("IE")?.textContent || "";
-                if (inscEstadual) {
-                    atualizacoes.INSCESTADUAL_destinatario = inscEstadual;
-                }
-            }
-
-            if (emit) {
-                const cpfCnpjRem = emit.querySelector("CPF")?.textContent || emit.querySelector("CNPJ")?.textContent || "";
-                if (cpfCnpjRem) {
-                    const cpf = formatarCpfCnpj(cpfCnpjRem, 'Remetente');
-                    atualizacoes.cpfCnpjRemetente = cpf;
-                }
-            }
-
-            if (ide) {
-                const nNF = (ide.querySelector("nNF")?.textContent || "").trim();
-
-                const chave = (
-                    xmlDoc
-                        .querySelector("infNFe")
-                        ?.getAttribute("Id")
-                        ?.replace("NFe", "") || ""
-                ).trim();
-
-                if (!atualizacoes.DOCNFE) {
-                    atualizacoes.DOCNFE = [];
-                }
-
-
-                const existe = atualizacoes.DOCNFE.some(
-                    x => (x.chaveNotaFiscal || "").trim() === chave
-                );
-
-
-
-                if (!existe) {
-                    console.log("Adicionando", chave);
-
-                    atualizacoes.DOCNFE.push({
-                        chaveNotaFiscal: chave,
-                        numeroNotaFiscal: nNF
-                    });
-                }
-            }
-
-            if (vol) {
-                const produto = xmlDoc.querySelector("prod")?.querySelector("xProd")?.textContent?.split(' ')[0] || "";
-                atualizacoes.produtoPredominante = produto;
-            }
-
-            let valorCarga = 0;
-            if (icmsTot) {
-                const vNF = icmsTot.querySelector("vNF")?.textContent || "0";
-                atualizacoes.valorCarga = vNF;
-                valorCarga = parseFloat(vNF);
-            }
-
-
-            if (vol) {
-                const volumes = xmlDoc.querySelectorAll("vol");
-                const pesoTotal = Array.from(volumes).reduce((total, vol) => {
-                    const peso = parseFloat(
-                        vol.querySelector("pesoB")?.textContent || "0"
-                    );
-
-                    return total + peso;
-                }, 0);
-
-                const tipoVeiculo = pegarTipoDeCaminhao(pesoTotal);
-                setTipoVeiculo(tipoVeiculo);
-                atualizacoes.quantidadeCarga = pesoTotal.toString();
-            }
-
-            const saidaCidade = exit?.querySelector("xMun")?.textContent || "";
-            const saidaUF = exit?.querySelector("UF")?.textContent || "";
-            const destinoCidade = destination?.querySelector("xMun")?.textContent || "";
-            const destinoUF = destination?.querySelector("UF")?.textContent || "";
-
-            atualizacoes.saida = {
-                city: saidaCidade,
-                uf: saidaUF
-            }
-            atualizacoes.destino = {
-                city: destinoCidade,
-                uf: destinoUF
-            }
-
-            if (saidaCidade && destinoCidade && saidaUF && destinoUF) {
-                if (moreOneNota) {
-                    const volumes = xmlDoc.querySelectorAll("vol");
-                    const pesoTotal = Array.from(volumes).reduce((total, vol) => {
-                        const peso = parseFloat(
-                            vol.querySelector("pesoB")?.textContent || "0"
-                        );
-
-                        return total + peso;
-                    }, 0);
-
-                    setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(pesoTotal), valorCarga, destino: { city: destinoCidade, uf: destinoUF } }]);
-                    setDadosXML({ ...dadosXML, ...atualizacoes });
-                } else {
-                    calcularAposEscolherVipoDeCaminha(saidaCidade, saidaUF, destinoCidade, destinoUF, Number(atualizacoes.quantidadeCarga))
-                }
-
-            }
-
-
-        } catch (error) {
-            toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
+      if (basicos.temDest) {
+        if (basicos.cpfCnpjDestinatario) {
+          atualizacoes.cpfCnpjDestinatario = basicos.cpfCnpjDestinatario;
         }
-    };
+        if (basicos.inscEstadualDestinatario) {
+          atualizacoes.INSCESTADUAL_destinatario = basicos.inscEstadualDestinatario;
+        }
+      }
 
-    const calcularAposEscolherVipoDeCaminha = (saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string, quantidadeCarga: number, tipoVeiculo?: string) => {
+      if (basicos.temEmit && basicos.cpfCnpjRemetente) {
+        atualizacoes.cpfCnpjRemetente = basicos.cpfCnpjRemetente;
+      }
 
-        setTipoVeiculo(tipoVeiculo as '14' | '19' | '27_30' | '32_35' | '38_40' | '50');
-
-        const serviço = calcularFrete({
-            city: saidaCidade,
-            uf: saidaUF
-        }, {
-            city: destinoCidade,
-            uf: destinoUF
-        }, quantidadeCarga, tipoVeiculo as '14' | '19' | '27_30' | '32_35' | '38_40' | '50' || tipoVeiculo || '50')
-        if (!serviço) {
-            toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
-            return
+      if (basicos.temIde) {
+        if (!atualizacoes.DOCNFE) {
+          atualizacoes.DOCNFE = [];
         }
 
-        calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
-    }
+        const existe = atualizacoes.DOCNFE.some(
+          x => (x.chaveNotaFiscal || "").trim() === basicos.chaveNotaFiscal
+        );
 
-    const somarValoresMaisDeUmaNota = () => {
-        let pesoTotal = 0;
-        let valorTotalCarga = 0;
-
-        dadosDeNotasCarregadas.forEach((nota) => {
-            pesoTotal += nota.peso;
-            valorTotalCarga += nota.valorCarga;
-        })
-
-        atualizacoes.valorCarga = valorTotalCarga.toString();
-        atualizacoes.quantidadeCarga = pesoTotal.toString();
-        setDadosXML({ ...dadosXML, quantidadeCarga: pesoTotal.toString(), valorCarga: valorTotalCarga.toString() });
-
-        const serviço = calcularFrete({
-            city: dadosDeNotasCarregadas[0].destino.city,
-            uf: dadosDeNotasCarregadas[0].destino.uf
-        }, {
-            city: dadosDeNotasCarregadas[0].destino.city,
-            uf: dadosDeNotasCarregadas[0].destino.uf
-        }, Number(pesoTotal), tipoVeiculo)
-
-        if (!serviço) {
-            return
+        if (!existe) {
+          atualizacoes.DOCNFE.push({
+            chaveNotaFiscal: basicos.chaveNotaFiscal,
+            numeroNotaFiscal: basicos.numeroNotaFiscal
+          });
         }
+      }
 
-        calcularPorcentagens({ serviço: { valorDoServiço: serviço.valorDoServiço }, saidaCidade: dadosXML.saida.city, saidaUF: dadosXML.saida.uf, destinoCidade: dadosXML.destino.city, destinoUF: dadosXML.destino.uf })
-        setDadosXML({ ...dadosXML, ...atualizacoes });
-    }
+      if (basicos.temVol) {
+        atualizacoes.produtoPredominante = basicos.produtoPredominante;
+      }
 
-    const calcularPorcentagens = ({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF }: { serviço: { valorDoServiço: number }, saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string }) => {
-        atualizacoes.valorServico = serviço.valorDoServiço
-        // atualizacoes.valorIBS = (serviço.valorDoServiço * 0.001).toFixed(2).toString()
-        // atualizacoes.percentualCBS = (serviço.valorDoServiço * 0.009).toFixed(2).toString()
-        atualizacoes.valorICMS = (serviço.valorDoServiço * 0.12).toFixed(2).toString()
-        atualizacoes.saida = {
-            city: saidaCidade,
-            uf: saidaUF
-        };
-        atualizacoes.destino = {
-            city: destinoCidade,
-            uf: destinoUF
-        };
+      let valorCarga = 0;
+      if (basicos.temIcmsTot) {
+        atualizacoes.valorCarga = basicos.valorCarga;
+        valorCarga = parseFloat(basicos.valorCarga);
+      }
 
-        setDadosXML({ ...dadosXML, ...atualizacoes });
+      if (basicos.temVol) {
+        const tipoVeiculoCalculado = pegarTipoDeCaminhao(basicos.pesoTotal);
+        setTipoVeiculo(tipoVeiculoCalculado);
+        atualizacoes.quantidadeCarga = basicos.pesoTotal.toString();
+      }
 
-    }
+      atualizacoes.saida = {
+        city: basicos.saidaCidade,
+        uf: basicos.saidaUF
+      }
+      atualizacoes.destino = {
+        city: basicos.destinoCidade,
+        uf: basicos.destinoUF
+      }
 
+      if (basicos.saidaCidade && basicos.destinoCidade && basicos.saidaUF && basicos.destinoUF) {
+        const tipoVeiculoCalculado = basicos.temVol ? pegarTipoDeCaminhao(basicos.pesoTotal) : undefined;
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file && file.type === "text/xml") {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const xmlContent = e.target?.result as string;
-                if (moreOneNota) {
-                    setNotasCarregadas(prevNotas => [...prevNotas, xmlContent]);
-                    return;
-                }
-                processarXML(xmlContent);
-            };
-            reader.readAsText(file);
+        if (moreOneNota) {
+          setDadosDeNotasCarregadas(prevDados => [...prevDados, { peso: Number(basicos.pesoTotal), valorCarga, destino: { city: basicos.destinoCidade, uf: basicos.destinoUF } }]);
+          setDadosXML({ ...dadosXML, ...atualizacoes });
         } else {
-            toast.error("Por favor, selecione um arquivo XML válido.");
+          calcularAposEscolherVipoDeCaminha(
+            basicos.saidaCidade,
+            basicos.saidaUF,
+            basicos.destinoCidade,
+            basicos.destinoUF,
+            Number(atualizacoes.quantidadeCarga),
+            tipoVeiculoCalculado
+          )
         }
+      }
+    } catch (error) {
+      toast.error("Erro ao processar o arquivo XML. Verifique o formato do arquivo.");
+    }
+  };
+
+  const calcularAposEscolherVipoDeCaminha = (saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string, quantidadeCarga: number, tipoVeiculoSelecionado?: string) => {
+    const tipoVeiculoFinal = (tipoVeiculoSelecionado ?? tipoVeiculo ?? '50') as '14' | '19' | '27_30' | '32_35' | '38_40' | '50';
+
+    setTipoVeiculo(tipoVeiculoFinal);
+
+    const serviço = calcularFrete({
+      city: saidaCidade,
+      uf: saidaUF
+    }, {
+      city: destinoCidade,
+      uf: destinoUF
+    }, quantidadeCarga, tipoVeiculoFinal)
+    if (!serviço) {
+      toast.error("Erro ao calcular o valor do serviço. Verifique as cidades de origem e destino.");
+      return
+    }
+
+    calcularPorcentagens({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF });
+  }
+
+  const somarValoresMaisDeUmaNota = () => {
+    let pesoTotal = 0;
+    let valorTotalCarga = 0;
+
+    dadosDeNotasCarregadas.forEach((nota) => {
+      pesoTotal += nota.peso;
+      valorTotalCarga += nota.valorCarga;
+    })
+
+    atualizacoes.valorCarga = valorTotalCarga.toString();
+    atualizacoes.quantidadeCarga = pesoTotal.toString();
+    setDadosXML({ ...dadosXML, quantidadeCarga: pesoTotal.toString(), valorCarga: valorTotalCarga.toString() });
+
+    const serviço = calcularFrete({
+      city: dadosDeNotasCarregadas[0].destino.city,
+      uf: dadosDeNotasCarregadas[0].destino.uf
+    }, {
+      city: dadosDeNotasCarregadas[0].destino.city,
+      uf: dadosDeNotasCarregadas[0].destino.uf
+    }, Number(pesoTotal), tipoVeiculo)
+
+    if (!serviço) {
+      return
+    }
+
+    calcularPorcentagens({ serviço: { valorDoServiço: serviço.valorDoServiço }, saidaCidade: dadosXML.saida.city, saidaUF: dadosXML.saida.uf, destinoCidade: dadosXML.destino.city, destinoUF: dadosXML.destino.uf })
+    setDadosXML({ ...dadosXML, ...atualizacoes });
+  }
+
+  const calcularPorcentagens = ({ serviço, saidaCidade, saidaUF, destinoCidade, destinoUF }: { serviço: { valorDoServiço: number }, saidaCidade: string, saidaUF: string, destinoCidade: string, destinoUF: string }) => {
+    atualizacoes.valorServico = serviço.valorDoServiço
+    atualizacoes.valorICMS = (serviço.valorDoServiço * 0.12).toFixed(2).toString()
+    atualizacoes.saida = {
+      city: saidaCidade,
+      uf: saidaUF
+    };
+    atualizacoes.destino = {
+      city: destinoCidade,
+      uf: destinoUF
     };
 
-    const processarTodasNotas = () => {
-        if (notasCarregadas.length === 0) {
-            toast.error("Nenhuma nota carregada para processar.");
-            return;
+    setDadosXML({ ...dadosXML, ...atualizacoes });
+  }
+
+  const handleFileUpload = (file: File) => {
+    if (file.type === "text/xml" || file.name.toLowerCase().endsWith('.xml')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const xmlContent = e.target?.result as string;
+        if (moreOneNota) {
+          setNotasCarregadas(prevNotas => [...prevNotas, xmlContent]);
+          return;
         }
-        if (notasCarregadas.some(xml => !xml || xml.trim() === "")) {
-            toast.error("Uma ou mais notas carregadas estão vazias. Verifique os arquivos XML.");
-            return;
+        processarXML(xmlContent);
+      };
+      reader.readAsText(file);
+    } else {
+      toast.error("Por favor, selecione um arquivo XML válido.");
+    }
+  };
+
+  const processarTodasNotas = () => {
+    if (notasCarregadas.length === 0) {
+      toast.error("Nenhuma nota carregada para processar.");
+      return;
+    }
+    if (notasCarregadas.some(xml => !xml || xml.trim() === "")) {
+      toast.error("Uma ou mais notas carregadas estão vazias. Verifique os arquivos XML.");
+      return;
+    }
+    notasCarregadas.forEach((e) => {
+      processarXML(notasCarregadas[notasCarregadas.indexOf(e)]);
+    });
+  }
+
+  const loadingData = async () => {
+    if (!tipoVeiculo) {
+      toast.error("Selecione o tipo de veículo para continuar")
+      return
+    }
+    setProcessando(true)
+    try {
+      if (!empresa) {
+        toast.error("Empresa não encontrada")
+        throw new Error("Empresa não encontrada")
+      }
+
+      const atualizacoes: Partial<CTE> = { ...cteSelecionado };
+
+      if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
+        toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
+        return
+      }
+
+      const [destinatarioData, remetenteData, veiculoTracaoData, motoristaData] = await Promise.all([
+        comboBoxCadastro(empresa, dadosXML.cpfCnpjDestinatario),
+        comboBoxCadastro(empresa, dadosXML.cpfCnpjRemetente),
+        comboBoxVeiculo(empresa, dadosXML.placaVeiculoTração),
+        comboBoxCadastro(empresa, dadosXML.cpf_motorista),
+      ]);
+
+      if (motoristaData[0]) {
+        atualizacoes.IDMOTORISTA = motoristaData[0].IDCADASTRO
+        setDriverName(motoristaData[0].NOME)
+      } else {
+        toast.info("Motorista não encontrado")
+        throw new Error("Motorista não encontrado")
+      }
+
+      if (remetenteData[0]) {
+        atualizacoes.CODCIDADEEMISSAOCTE = remetenteData[0].CODCIDADE;
+        atualizacoes.CODCIDADEINISERV = remetenteData[0].CODCIDADE;
+        atualizacoes.NOMECIDADEINICIOSERV = remetenteData[0].NOMEMUNICIPIO;
+        atualizacoes.UFFIMSERV = remetenteData[0].CODESTADO;
+        atualizacoes.IDREMETENTE = remetenteData[0].IDCADASTRO
+        setRemetenteName(remetenteData[0].NOME)
+      } else {
+        toast.info("Remetente não encontrado")
+        throw new Error("Remetente não encontrado")
+      }
+
+      if (destinatarioData[0]) {
+        atualizacoes.NOMECIDADEFIMSERV = destinatarioData[0].NOMEMUNICIPIO;
+        atualizacoes.UFFIMSERV = destinatarioData[0].CODESTADO;
+        atualizacoes.CODCIDADEFIMSERV = destinatarioData[0].CODCIDADE;
+        atualizacoes.NOMECIDADEEMISSAO = destinatarioData[0].NOMEMUNICIPIO;
+        atualizacoes.IDDESTINATARIO = destinatarioData[0].IDCADASTRO;
+        atualizacoes.IDCONTRATANTE = destinatarioData[0].IDCADASTRO;
+        setDestName(destinatarioData[0].NOME)
+      } else {
+        toast.info("Destinatário não encontrado")
+        const documento = dadosXML.cpfCnpjDestinatario.replace(/\D/g, "");
+
+        setDestinatarioNaoEncontrado(true)
+        if (documento.length === 14) {
+          await getDadasCNPJ();
+          return;
         }
-        notasCarregadas.forEach((e) => {
-            processarXML(notasCarregadas[notasCarregadas.indexOf(e)]);
+        throw new Error("Destinatário não encontrado")
+      }
+      if (veiculoTracaoData[0] && atualizacoes.Veiculos) {
+        atualizacoes.Veiculos[0] = {
+          ...atualizacoes.Veiculos?.[0],
+          IDENT: veiculoTracaoData[0].IDENT,
+          RENAVAN: veiculoTracaoData[0].RENAVAN,
+          PLACA: veiculoTracaoData[0].PLACA,
+          TARA: veiculoTracaoData[0].TARA,
+          CAPACIDADEKG: veiculoTracaoData[0].CAPACIDADEKG,
+          CAPACIDADEM3: veiculoTracaoData[0].CAPACIDADEM3,
+          PROPRIO: veiculoTracaoData[0].PROPRIO,
+          TIPOVEICULO: veiculoTracaoData[0].TIPOVEICULO,
+          TIPORODADO: veiculoTracaoData[0].TIPORODADO,
+          TIPOCARROCERIA: veiculoTracaoData[0].TIPOCARROCERIA,
+          UFLICENCIADO: veiculoTracaoData[0].UFLICENCIADO,
+          CPFCNPJ: veiculoTracaoData[0].CPFCNPJ,
+          RNTC: veiculoTracaoData[0].RNTC,
+          NOMEPROPRIETARIO: veiculoTracaoData[0].NOMEPROPRIETARIO,
+          INSCESTADUAL: veiculoTracaoData[0].INSCESTADUAL,
+          UFINSCESTADUAL: veiculoTracaoData[0].UFINSCESTADUAL,
+          IDVEICULO: veiculoTracaoData[0].IDVEICULO,
+        }
+        atualizacoes.OBSVEICMOTVEIC = `Veiculo: ${veiculoTracaoData[0].PLACA}\nMotorista: ${veiculoTracaoData[0].NOMEPROPRIETARIO}` as string
+
+        atualizacoes.IDVEICULO = veiculoTracaoData[0].IDVEICULO
+        setVeicName(veiculoTracaoData[0].DESCRICAO)
+      } else {
+        toast.info("Veículo não encontrado")
+        throw new Error("Veículo não encontrado")
+      }
+      atualizacoes.DOCNFE = [];
+      dadosXML.DOCNFE.forEach((nota) => {
+        if (!atualizacoes.DOCNFE) {
+          atualizacoes.DOCNFE = [];
+        }
+
+        const existe = atualizacoes.DOCNFE.some(
+          n => n.CHAVENFE === nota.chaveNotaFiscal
+        );
+
+        if (!existe) {
+          atualizacoes.DOCNFE.push({
+            CHAVENFE: nota.chaveNotaFiscal,
+            NNF: nota.numeroNotaFiscal,
+          });
+        }
+      });
+
+      const valorCargaCorrigido = Number(dadosXML.valorCarga)
+      atualizacoes.VALORCARGA = valorCargaCorrigido
+      atualizacoes.DESCCARGA = dadosXML.produtoPredominante;
+      atualizacoes.TIPOCARGA = dadosXML.produtoPredominante;
+      atualizacoes.VALORSERVICO = dadosXML.valorServico
+      atualizacoes.VALORRECEBER = dadosXML.valorServico
+
+
+      if (atualizacoes.UFINISERV === "CE" && atualizacoes.UFFIMSERV !== "CE") {
+        atualizacoes.ICMS_VALORICMS = parseFloat(dadosXML.valorICMS);
+        atualizacoes.ICMS_VALORBC = dadosXML.valorServico
+      } else {
+        atualizacoes.ICMS_VALORICMS = 0;
+        atualizacoes.ICMS_VALORBC = 0
+      }
+      if (atualizacoes.IBSCBS) {
+        if (empresa.name !== 'GADELOG') {
+          atualizacoes.IBSCBS.vIBS = parseFloat(dadosXML.valorIBS)
+          atualizacoes.IBSCBS.vCBS = parseFloat(dadosXML.percentualCBS)
+        }
+        atualizacoes.IBSCBS.vBC = parseFloat(dadosXML.valorIBS)
+        atualizacoes.IBSCBS.vIBSUF = parseFloat(dadosXML.valorIBS)
+      }
+
+      if (atualizacoes.CARGAQTD && atualizacoes.CARGAQTD[0]) {
+        atualizacoes.CARGAQTD[0].QUANTIDADE = parseFloat(dadosXML.quantidadeCarga);
+        atualizacoes.PESOKG = parseFloat(dadosXML.quantidadeCarga);
+      }
+
+
+      if (cteSelecionado) {
+        setCteSelecionado({
+          ...cteSelecionado,
+          ...atualizacoes,
+          DOCNFE: atualizacoes.DOCNFE ? [...atualizacoes.DOCNFE] : []
         });
+      }
+
+      toast.info('Infomações atualizdas')
+
+    }
+    catch (error) {
+      toast.error("Erro ao carregar dados")
+    } finally {
+      setProcessando(false)
+    }
+  }
+
+  const sendData = async () => {
+    if (!empresa) {
+      toast.error("Empresa não encontrada")
+      return
+    }
+    setEnviando(true)
+    try {
+      await salvarCte(empresa, cteSelecionado as CTE);
+      limparNotasCarregadas()
+      escolherOutraCTE()
+      toast.info('CT-e enviado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
+    } finally {
+      setEnviando(false)
+    }
+  };
+
+  const getDadasCNPJ = async () => {
+    if (!empresa) {
+      toast.error("Empresa não selecionada")
+      return
     }
 
-    const loadingData = async () => {
-        if (!tipoVeiculo) {
-            toast.error("Selecione o tipo de veículo para continuar")
-            return
-        }
-        try {
-            if (!empresa) {
-                toast.error("Empresa não encontrada")
-                throw new Error("Empresa não encontrada")
-            }
+    try {
+      const data = await buscarCadastroReceitaFederal(empresa, dadosXML.cpfCnpjDestinatario.replace(/\D/g, ''))
+      const codCidade = await comboBoxCidade(empresa, data.CIDADEESTADO.split(' - ')[0])
 
-            const atualizacoes: Partial<CTE> = { ...cteSelecionado };
-
-            if (!dadosXML.cpfCnpjDestinatario || !dadosXML.cpfCnpjRemetente || !dadosXML.placaVeiculoTração || !dadosXML.cpf_motorista) {
-                toast.info("Informe o cnpj do destinatário, cpf do remetente, placa do veículo e cpf do motorista para continuar")
-                return
-            }
-
-            const [destinatario, Remetente, VeiculoTração, Motorista] = await Promise.all([
-                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
-                    "search": dadosXML.cpfCnpjDestinatario,
-                    "id": null,
-                    "propertyList": []
-                },
-                    {
-                        headers: {
-                            'Authorization': 'Bearer ' + empresa.token,
-                        }
-                    }),
-                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
-                    "search": dadosXML.cpfCnpjRemetente,
-                    "id": null,
-                    "propertyList": []
-                },
-                    {
-                        headers: {
-                            'Authorization': 'Bearer ' + empresa.token,
-                        }
-                    }),
-                axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GVEICULO`, {
-                    params: {
-                        "search": dadosXML.placaVeiculoTração,
-                        "tipoVeiculo": "T"
-                    },
-                    headers: {
-                        'Authorization': 'Bearer ' + empresa.token,
-                    }
-                }),
-                axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/ComboBox/GCADASTRO`, {
-                    "search": dadosXML.cpf_motorista,
-                    "id": null,
-                    "propertyList": []
-                },
-                    {
-                        headers: {
-                            'Authorization': 'Bearer ' + empresa.token,
-                        }
-                    })
-            ]);
-
-            if (Motorista.data[0]) {
-                atualizacoes.IDMOTORISTA = Motorista.data[0].IDCADASTRO
-                setDriverName(Motorista.data[0].NOME)
-            } else {
-                toast.info("Motorista não encontrado")
-                throw new Error("Motorista não encontrado")
-
-            }
-
-
-            if (Remetente.data[0]) {
-                atualizacoes.CODCIDADEEMISSAOCTE = Remetente.data[0].CODCIDADE;
-                atualizacoes.CODCIDADEINISERV = Remetente.data[0].CODCIDADE;
-                atualizacoes.NOMECIDADEINICIOSERV = Remetente.data[0].NOMEMUNICIPIO;
-                atualizacoes.UFFIMSERV = Remetente.data[0].CODESTADO;
-                atualizacoes.IDREMETENTE = Remetente.data[0].IDCADASTRO
-                setRemetenteName(Remetente.data[0].NOME)
-            } else {
-                toast.info("Remetente não encontrado")
-                throw new Error("Remetente não encontrado")
-
-            }
-
-            if (destinatario.data[0]) {
-                atualizacoes.NOMECIDADEFIMSERV = destinatario.data[0].NOMEMUNICIPIO;
-                atualizacoes.UFFIMSERV = destinatario.data[0].CODESTADO;
-                atualizacoes.CODCIDADEFIMSERV = destinatario.data[0].CODCIDADE;
-                atualizacoes.NOMECIDADEEMISSAO = destinatario.data[0].NOMEMUNICIPIO;
-                atualizacoes.IDDESTINATARIO = destinatario.data[0].IDCADASTRO;
-                atualizacoes.IDCONTRATANTE = destinatario.data[0].IDCADASTRO;
-                setDestName(destinatario.data[0].NOME)
-            } else {
-                toast.info("Destinatário não encontrado")
-                const documento = dadosXML.cpfCnpjDestinatario.replace(/\D/g, "");
-
-                setDestinatarioNaoEncontrado(true)
-                if (documento.length === 14) {
-                    await getDadasCNPJ();
-                    return;
-                }
-                throw new Error("Destinatário não encontrado")
-            }
-            if (VeiculoTração.data[0] && atualizacoes.Veiculos) {
-                atualizacoes.Veiculos[0] = {
-                    ...atualizacoes.Veiculos?.[0],
-                    IDENT: VeiculoTração.data[0].IDENT,
-                    RENAVAN: VeiculoTração.data[0].RENAVAN,
-                    PLACA: VeiculoTração.data[0].PLACA,
-                    TARA: VeiculoTração.data[0].TARA,
-                    CAPACIDADEKG: VeiculoTração.data[0].CAPACIDADEKG,
-                    CAPACIDADEM3: VeiculoTração.data[0].CAPACIDADEM3,
-                    PROPRIO: VeiculoTração.data[0].PROPRIO,
-                    TIPOVEICULO: VeiculoTração.data[0].TIPOVEICULO,
-                    TIPORODADO: VeiculoTração.data[0].TIPORODADO,
-                    TIPOCARROCERIA: VeiculoTração.data[0].TIPOCARROCERIA,
-                    UFLICENCIADO: VeiculoTração.data[0].UFLICENCIADO,
-                    CPFCNPJ: VeiculoTração.data[0].CPFCNPJ,
-                    RNTC: VeiculoTração.data[0].RNTC,
-                    NOMEPROPRIETARIO: VeiculoTração.data[0].NOMEPROPRIETARIO,
-                    INSCESTADUAL: VeiculoTração.data[0].INSCESTADUAL,
-                    UFINSCESTADUAL: VeiculoTração.data[0].UFINSCESTADUAL,
-                    IDVEICULO: VeiculoTração.data[0].IDVEICULO,
-                }
-                atualizacoes.OBSVEICMOTVEIC = `Veiculo: ${VeiculoTração.data[0].PLACA}\nMotorista: ${VeiculoTração.data[0].NOMEPROPRIETARIO}` as string
-
-                atualizacoes.IDVEICULO = VeiculoTração.data[0].IDVEICULO
-                setVeicName(VeiculoTração.data[0].DESCRICAO)
-            } else {
-                toast.info("Veículo não encontrado")
-                throw new Error("Veículo não encontrado")
-            }
-            atualizacoes.DOCNFE = [];
-            console.log(dadosXML.DOCNFE)
-            dadosXML.DOCNFE.forEach((nota) => {
-                if (!atualizacoes.DOCNFE) {
-                    atualizacoes.DOCNFE = [];
-                }
-
-                const existe = atualizacoes.DOCNFE.some(
-                    n => n.CHAVENFE === nota.chaveNotaFiscal
-                );
-                console.log(existe)
-
-                if (!existe) {
-                    atualizacoes.DOCNFE.push({
-                        CHAVENFE: nota.chaveNotaFiscal,
-                        NNF: nota.numeroNotaFiscal,
-                    });
-                }
-            });
-            console.log(atualizacoes.DOCNFE)
-
-            const valorCargaCorrigido = Number(dadosXML.valorCarga)
-            atualizacoes.VALORCARGA = valorCargaCorrigido
-            atualizacoes.DESCCARGA = dadosXML.produtoPredominante;
-            atualizacoes.TIPOCARGA = dadosXML.produtoPredominante;
-            atualizacoes.VALORSERVICO = dadosXML.valorServico
-            atualizacoes.VALORRECEBER = dadosXML.valorServico
-
-
-            if (atualizacoes.UFINISERV === "CE" && atualizacoes.UFFIMSERV !== "CE") {
-                atualizacoes.ICMS_VALORICMS = parseFloat(dadosXML.valorICMS);
-                atualizacoes.ICMS_VALORBC = dadosXML.valorServico
-            } else {
-                atualizacoes.ICMS_VALORICMS = 0;
-                atualizacoes.ICMS_VALORBC = 0
-            }
-            if (atualizacoes.IBSCBS) {
-                if (empresa.name !== 'GADELOG') {
-                    atualizacoes.IBSCBS.vIBS = parseFloat(dadosXML.valorIBS)
-                    atualizacoes.IBSCBS.vCBS = parseFloat(dadosXML.percentualCBS)
-                }
-                atualizacoes.IBSCBS.vBC = parseFloat(dadosXML.valorIBS)
-                atualizacoes.IBSCBS.vIBSUF = parseFloat(dadosXML.valorIBS)
-            }
-
-            if (atualizacoes.CARGAQTD && atualizacoes.CARGAQTD[0]) {
-                atualizacoes.CARGAQTD[0].QUANTIDADE = parseFloat(dadosXML.quantidadeCarga);
-                atualizacoes.PESOKG = parseFloat(dadosXML.quantidadeCarga);
-            }
-
-
-            if (cteSelecionado) {
-                setCteSelecionado({
-                    ...cteSelecionado,
-                    ...atualizacoes,
-                    DOCNFE: atualizacoes.DOCNFE ? [...atualizacoes.DOCNFE] : []
-                });
-            }
-
-            toast.info('Infomações atualizdas')
-
-
-
-        }
-        catch (error) {
-            toast.error("Erro ao carregar dados")
-            throw error;
-        }
+      await createDestinatário({
+        email: data.email,
+        telefone: data.Telefone,
+        nome: data.Nome,
+        endereco: data.Logradouro,
+        bairro: data.Bairro,
+        numero: data.Numero,
+        complemento: data.Complemento,
+        cep: data.Cep,
+        cidade: data.CIDADEESTADO,
+        uf: data.Uf,
+        CODCIDADE: codCidade[0].CODMUNICIPIO
+      })
+    } catch (error) {
+      toast.error("Erro ao buscar dados do CNPJ")
     }
+  }
 
-    const sendData = async () => {
-
-        if (!empresa) {
-            toast.error("Empresa não encontrada")
-            return
-        }
-        try {
-
-            await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/Salvar`, cteSelecionado, {
-                headers: {
-                    'Authorization': 'Bearer ' + empresa.token,
-                    'Content-Type': 'application/json'
-                }
-            });
-            limparNotasCarregadas()
-            escolherOutraCTE()
-            console.log(cteSelecionado)
-            toast.info('CT-e enviado com sucesso!');
-        } catch (error) {
-            toast.error('Erro ao enviar CT-e. Verifique os dados e tente novamente.');
-        }
-    };
-
-    const getDadasCNPJ = async () => {
-        if (!empresa) {
-            toast.error("Empresa não selecionada")
-            return
-        }
-
-
-        try {
-            const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/Sistema/GetCadastroReceiraFederal?CNPJ=${dadosXML.cpfCnpjDestinatario.replace(/\D/g, '')}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${empresa.token}`
-                    }
-                })
-
-
-            const codCidade = await axios.get(`https://api.egssistemas.com.br/EGSAPP4//api/ComboBox/GCIDADE?search=${data.CIDADEESTADO.split(' - ')[0]}`, {
-                headers: {
-                    Authorization: `Bearer ${empresa.token}`
-                }
-            })
-
-            await createDestinatário({
-                email: data.email,
-                telefone: data.Telefone,
-                nome: data.Nome,
-                endereco: data.Logradouro,
-                bairro: data.Bairro,
-                numero: data.Numero,
-                complemento: data.Complemento,
-                cep: data.Cep,
-                cidade: data.CIDADEESTADO,
-                uf: data.Uf,
-                CODCIDADE: codCidade.data[0].CODMUNICIPIO
-            })
-        } catch (error) {
-            console.error(error)
-            toast.error("Erro ao buscar dados do CNPJ")
-        }
+  const createDestinatário = async ({ email, telefone, nome, endereco, bairro, numero, complemento, cep, uf, CODCIDADE }: { email: string, telefone: string, nome: string, endereco: string, bairro: string, numero: string, complemento: string, cep: string, cidade: string, uf: string, CODCIDADE: string }) => {
+    if (!empresa) {
+      toast.error("Empresa nao selecionada")
+      return
     }
+    try {
+      const data = await criarCadastro(empresa, {
+        RAZAOSOCIAL: nome,
+        NOME: nome,
+        CPFCNPJ: dadosXML.cpfCnpjDestinatario.replace(/\D/g, ''),
+        CONSUMIDORFINAL: "0",
+        CONTRIBUINTEICMS: "1",
+        FONE: telefone,
+        EMAIL: email,
+        EMAILNFE: email,
+        ENDERECO: endereco,
+        BAIRRO: bairro,
+        NUMERO: numero,
+        CEP: cep,
+        CODESTADO: uf,
+        CODPAIS: "1058",
+        INSCESTADUAL: dadosXML.INSCESTADUAL_destinatario,
+        CODCIDADE: CODCIDADE,
+        COMPLEMENTO: complemento
+      })
+      if (!data.IDCADASTRO) {
+        toast.error("Erro ao criar destinatário")
+        return
+      }
 
-    const createDestinatário = async ({ email, telefone, nome, endereco, bairro, numero, complemento, cep, cidade, uf, CODCIDADE }: { email: string, telefone: string, nome: string, endereco: string, bairro: string, numero: string, complemento: string, cep: string, cidade: string, uf: string, CODCIDADE: string }) => {
-        if (!empresa) {
-            toast.error("Empresa nao selecionada")
-            return
-        }
-        try {
-            const { data } = await axios.post(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/GcadastroApi/post`,
-                {
-                    RAZAOSOCIAL: nome,
-                    NOME: nome,
-                    CPFCNPJ: dadosXML.cpfCnpjDestinatario.replace(/\D/g, ''),
-                    CONSUMIDORFINAL: "0",
-                    CONTRIBUINTEICMS: "1",
-                    FONE: telefone,
-                    EMAIL: email,
-                    EMAILNFE: email,
-                    ENDERECO: endereco,
-                    BAIRRO: bairro,
-                    NUMERO: numero,
-                    CEP: cep,
-                    CODESTADO: uf,
-                    CODPAIS: "1058",
-                    INSCESTADUAL: dadosXML.INSCESTADUAL_destinatario,
-                    CODCIDADE: CODCIDADE,
-                    COMPLEMENTO: complemento
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${empresa.token}`
-                    }
-                }
-            )
-            if (!data.IDCADASTRO) {
-                toast.error("Erro ao criar destinatário")
-                return
-            }
-
-
-            toast.success("destinatário cadastrado com sucesso!")
-        } catch (e) {
-            toast.error("Erro ao criar destinatário")
-        }
+      toast.success("destinatário cadastrado com sucesso!")
+    } catch (e) {
+      toast.error("Erro ao criar destinatário")
     }
+  }
 
-    const limparNotasCarregadas = () => {
-        setNotasCarregadas([]);
-        setDadosDeNotasCarregadas([])
-        setMoreOneNota(false)
-    }
+  const limparNotasCarregadas = () => {
+    setNotasCarregadas([]);
+    setDadosDeNotasCarregadas([])
+    setMoreOneNota(false)
+  }
 
-    const escolherOutraCTE = () => {
-        setCteSelecionado(null)
-    }
+  const escolherOutraCTE = () => {
+    setCteSelecionado(null)
+  }
 
-    if (!cteSelecionado) {
-        return (
-            <p> Carregando... </p>
-        )
-    }
+  if (!cteSelecionado) {
+    return <p className="p-8 text-center text-slate-500">Carregando...</p>
+  }
 
-    return (
-        <div>
-            <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => escolherOutraCTE()}>
-                Escolher outro XML
-            </button>
-            <div className="p-6">
-                <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-8 shadow-sm hover:border-blue-400 transition-colors">
-                    <div className="text-center">
-                        <div>
-                            <p>Mais de 1 Nota</p>
-                            <input type="checkbox" checked={moreOneNota} className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded h-5 w-5" onClick={() => setMoreOneNota(!moreOneNota)} >
-                            </input>
-                        </div>
-                        <div className="border-t border-gray-200 pt-4">
-                            <label htmlFor="xml-upload" className="group relative flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <p className="mb-2 text-sm text-gray-600">
-                                        <span className="font-semibold text-blue-600">Clique para selecionar</span> ou arraste o arquivo XML aqui
-                                    </p>
-                                    <p className="text-xs text-gray-500">Apenas arquivos .xml (máx. 10MB)</p>
-                                </div>
-                                <input
-                                    id="xml-upload"
-                                    name="xml-upload"
-                                    type="file"
-                                    accept=".xml"
-                                    multiple={false}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    onChange={handleFileUpload}
-                                />
-                            </label>
-                        </div>
-                        {notasCarregadas.length > 0 && (
-                            <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center">
-                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => processarTodasNotas()} disabled={notasCarregadas.length === 0}>
-                                    Processar todas as notas carregadas
-                                </button>
-                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => somarValoresMaisDeUmaNota()} disabled={notasCarregadas.length === 0}>
-                                    Somar valores de todas as notas carregadas
-                                </button>
+  return (
+    <div className="animate-fade-in">
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <Button variant="ghost" size="sm" icon={<RefreshCw className="h-4 w-4" />} onClick={() => escolherOutraCTE()}>
+          Escolher outro XML
+        </Button>
+      </div>
 
-                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => limparNotasCarregadas()} disabled={notasCarregadas.length === 0}>
-                                    Limpar Notas
-                                </button>
+      <div className="p-6 space-y-6">
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-600">Importar nota fiscal (XML)</p>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={moreOneNota}
+                onChange={() => setMoreOneNota(!moreOneNota)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Mais de 1 nota
+            </label>
+          </div>
 
-                            </div>
-                        )}
-                    </div>
-                </div>
+          <FileDropzone
+            accept=".xml"
+            label="Clique para selecionar ou arraste o arquivo XML aqui"
+            hint="Apenas arquivos .xml (máx. 10MB)"
+            onFileSelected={handleFileUpload}
+          />
 
-                {/* Navegação por Abas */}
-                <div className="border-b border-gray-200">
-                    <nav className="flex space-x-8 px-6" aria-label="Tabs">
-                        <button
-                            type="button"
-                            onClick={() => setTab("identificação")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "identificação"
-                                ? "border-blue-500 text-blue-600"
-                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
-                        >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 016 0zm-4 0a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2V9a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            Identificação
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTab("Comp/Tributos")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "Comp/Tributos"
-                                ? "border-blue-500 text-blue-600"
-                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
-                        >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zM9 5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Componentes/Tributos
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTab("documentos")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "documentos"
-                                ? "border-blue-500 text-blue-600"
-                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
-                        >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2zM9 5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Documentos
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setTab("Reforma Tributária")}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${tab === "Reforma Tributária"
-                                ? "border-blue-500 text-blue-600"
-                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                                }`}
-                        >
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                            </svg>
-                            Reforma Tributária
-                        </button>
-                        <select
-                            value={tipoVeiculo}
-                            onChange={(e) => {
-                                setTipoVeiculo(e.target.value as '14' | '19' | '27_30' | '32_35' | '38_40' | '50');
-                                calcularAposEscolherVipoDeCaminha(dadosXML.saida.city, dadosXML.saida.uf, dadosXML.destino.city, dadosXML.destino.uf, Number(dadosXML.quantidadeCarga), e.target.value)
-                            }}
-                            className="py-4 px-1 border-b-2 font-medium text-sm transition-colors border-transparent  hover:text-gray-700 hover:border-gray-300">
-                            <option disabled>Tipo de Veículo</option>
-                            <option value="14">14 TON</option>
-                            <option value="19">19 TON</option>
-                            <option value="27_30">27-30 TON</option>
-                            <option value="32_35">32-35 TON</option>
-                            <option value="38_40">38-40 TON</option>
-                            <option value="50">50 TON</option>
-                        </select>
-                    </nav>
-                </div>
+          {notasCarregadas.length > 0 && (
+            <div className="mt-4 flex flex-col justify-center gap-2 md:flex-row">
+              <Button size="sm" onClick={() => processarTodasNotas()} disabled={notasCarregadas.length === 0}>
+                Processar todas as notas carregadas
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => somarValoresMaisDeUmaNota()} disabled={notasCarregadas.length === 0}>
+                Somar valores de todas as notas carregadas
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => limparNotasCarregadas()} disabled={notasCarregadas.length === 0}>
+                Limpar Notas
+              </Button>
             </div>
+          )}
+        </Card>
 
-            <form>
-                {tab === "identificação" && (
-                    <div className="space-y-8">
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                                Dados das Partes
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label htmlFor="Remetente" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                                        </svg>
-                                        Remetente CPF/CNPJ
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.cpfCnpjRemetente}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            formatarCpfCnpj(e.target.value, 'Remetente');
-                                        }}
-                                        id="Remetente"
-                                        name="Remetente"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="00.000.000/0000-00"
-                                    />
-                                    <span className="text-sm text-gray-500">{rementName}</span>
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="destinatario" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-                                        </svg>
-                                        Destinatário CPF/CNPJ
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.cpfCnpjDestinatario}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            setDadosXML({ ...dadosXML, cpfCnpjDestinatario: formatarCpfCnpj(e.target.value, 'destinatario') });
-                                        }}
-                                        id="destinatario"
-                                        name="destinatario"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="00.000.000/0000-00"
-                                    />
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <Tabs items={TABS} value={tab} onChange={setTab} />
 
-                                    <span className="text-sm text-gray-500">{destName}</span>
-
-                                    {destinatarioNaoEncontrado && (
-                                        <div className="mt-6 rounded-2xl border border-amber-200 bg-white shadow-lg overflow-hidden">
-                                            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
-                                                <h3 className="text-lg font-semibold text-white">
-                                                    Destinatário não encontrado
-                                                </h3>
-                                                <p className="mt-1 text-sm text-amber-100">
-                                                    Preencha os dados abaixo para cadastrar um novo destinatário.
-                                                </p>
-                                            </div>
-
-                                            <div className="p-6 space-y-5">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-                                                    <div>
-                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
-                                                            Nome / Inscrição Estadual
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={dadosXML.nome_destinatario}
-                                                            onChange={(e) =>
-                                                                setDadosXML({
-                                                                    ...dadosXML,
-                                                                    nome_destinatario: e.target.value,
-                                                                })
-                                                            }
-                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
-                                                            placeholder="Nome ou Inscrição Estadual"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
-                                                            E-mail
-                                                        </label>
-                                                        <input
-                                                            type="email"
-                                                            value={dadosXML.email_destinatario}
-                                                            onChange={(e) =>
-                                                                setDadosXML({
-                                                                    ...dadosXML,
-                                                                    email_destinatario: e.target.value,
-                                                                })
-                                                            }
-                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
-                                                            placeholder="email@empresa.com"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
-                                                            Telefone
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={dadosXML.fone_destinatario}
-                                                            onChange={(e) =>
-                                                                setDadosXML({
-                                                                    ...dadosXML,
-                                                                    fone_destinatario: e.target.value,
-                                                                })
-                                                            }
-                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
-                                                            placeholder="(99) 99999-9999"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block mb-2 text-sm font-medium text-gray-700">
-                                                            Cidade
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={dadosXML.cidade_destinatario}
-                                                            onChange={(e) =>
-                                                                setDadosXML({
-                                                                    ...dadosXML,
-                                                                    cidade_destinatario: e.target.value,
-                                                                })
-                                                            }
-                                                            className="w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm transition focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
-                                                            placeholder="Cidade"
-                                                        />
-                                                    </div>
-
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                                Dados da Carga
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                        </svg>
-                                        Produto predominante
-                                    </label>
-                                    <input type="text" value={dadosXML.produtoPredominante} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                        setDadosXML({ ...dadosXML, produtoPredominante: e.target.value });
-                                    }} className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out" placeholder="Ex: Fio, Tecido, etc." />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                        </svg>
-                                        Valor da carga
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={`R$ ${dadosXML.valorCarga}`}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            setDadosXML({ ...dadosXML, valorCarga: e.target.value });
-                                        }}
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
-                                        </svg>
-                                        Quantidade carga
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.quantidadeCarga}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            const value = e.target.value.replace('.', '').replace(',', '.');
-                                            setDadosXML({ ...dadosXML, quantidadeCarga: value });
-                                        }}
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="0,00"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                                        </svg>
-                                        Valor serviço / Receber
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.valorServico}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(e.target.value) });
-                                        }}
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                )}
-                {tab === "Comp/Tributos" && (
-                    <div className="space-y-8">
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label htmlFor="placaVeiculoTração" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                                        </svg>
-                                        Veículo Tração ( PLACA )
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.placaVeiculoTração}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            setDadosXML({ ...dadosXML, placaVeiculoTração: e.target.value });
-                                        }}
-                                        id="placaVeiculoTração"
-                                        name="placaVeiculoTração"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="ABC-1234"
-                                    />
-                                    <span className="text-sm text-gray-500">{veicName}</span>
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="proprietario" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path>
-                                        </svg>
-                                        Motorista ( CPF )
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formatarCpfCnpj(dadosXML.cpf_motorista, 'cpf_motorista')}
-                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            setDadosXML({ ...dadosXML, cpf_motorista: e.target.value });
-                                        }}
-                                        id="proprietario"
-                                        name="proprietario"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="000.000.000-00"
-                                    />
-                                    <span className="text-sm text-gray-500">{driverName}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                                Dados da Carga
-                            </h2>
-                            <div className="space-y-2">
-                                <label htmlFor="icms" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                    <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                                    </svg>
-                                    Valor do ICMS ( 12 %)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={dadosXML.valorICMS}
-                                    onChange={(e) => {
-                                        setDadosXML({ ...dadosXML, valorICMS: e.target.value });
-                                    }}
-                                    id="icms"
-                                    name="icms"
-                                    className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                />
-                            </div>
-                        </div>
-
-
-                    </div>
-                )}
-
-                {tab === "documentos" && (
-                    <div className="space-y-8">
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                Documentos Fiscais
-                            </h2>
-                            {dadosXML && dadosXML.DOCNFE.length > 0 && dadosXML.DOCNFE.map((doc, index) => (
-                                <div key={doc.chaveNotaFiscal || index} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label htmlFor={`numeroNotaFiscal-${index}`} className="block text-sm font-semibold text-gray-700 flex items-center">
-                                            <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                            </svg>
-                                            Número da Nota Fiscal
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={doc.numeroNotaFiscal}
-                                            onChange={(e) => {
-                                                setDadosXML({
-                                                    ...dadosXML,
-                                                    DOCNFE: dadosXML.DOCNFE.map((item, i) =>
-                                                        i === index ? { ...item, numeroNotaFiscal: e.target.value } : item
-                                                    )
-                                                });
-                                            }}
-                                            id={`numeroNotaFiscal-${index}`}
-                                            name={`numeroNotaFiscal-${index}`}
-                                            className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                            placeholder="000000000"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor={`chaveNotaFiscal-${index}`} className="block text-sm font-semibold text-gray-700 flex items-center">
-                                            <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-                                            </svg>
-                                            Chave da Nota Fiscal
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={doc.chaveNotaFiscal}
-                                            onChange={(e) => {
-                                                setDadosXML({
-                                                    ...dadosXML,
-                                                    DOCNFE: dadosXML.DOCNFE.map((item, i) =>
-                                                        i === index ? { ...item, chaveNotaFiscal: e.target.value } : item
-                                                    )
-                                                });
-                                            }}
-                                            id={`chaveNotaFiscal-${index}`}
-                                            name={`chaveNotaFiscal-${index}`}
-                                            className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                            placeholder="Chave de 44 dígitos"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {tab === 'Reforma Tributária' && (
-                    <div className="space-y-8">
-                        <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                                <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                </svg>
-                                Contribuições da Reforma Tributária
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <label htmlFor="valorBC" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                        </svg>
-                                        v. BC IBS/CBS  ( serviço )
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.valorServico}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace('R$', '').replace(',', '.').trim();
-                                            setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
-                                        }}
-                                        id="valorBC"
-                                        name="valorBC"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label htmlFor="valorBC" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                        </svg>
-                                        v IBS
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={dadosXML.valorIBS || ''}
-                                        onChange={(e) => {
-                                            setDadosXML({ ...dadosXML, valorIBS: e.target.value });
-                                        }}
-                                        id="valorBC"
-                                        name="valorBC"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
-
-
-
-                                <div className="space-y-2">
-                                    <label htmlFor="percentualCBS" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                        </svg>
-                                        v. CBS
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={cteSelecionado.IBSCBS?.vCBS}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace('%', '').replace(',', '.').trim();
-                                            setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vCBS: parseFloat(value) || 0 } });
-                                        }}
-                                        id="percentualCBS"
-                                        name="percentualCBS"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="0,00%"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="valorIBS" className="block text-sm font-semibold text-gray-700 flex items-center">
-                                        <svg className="w-4 h-4 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                                        </svg>
-                                        v. IBS UF / v. IBS ( 0.1% )
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={cteSelecionado.IBSCBS?.vIBS}
-                                        onChange={(e) => {
-                                            const value = e.target.value.replace(',', '.').trim();
-                                            setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vIBS: parseFloat(value) || 0 } });
-
-                                        }}
-                                        id="valorIBS"
-                                        name="valorIBS"
-                                        className="block w-full px-4 py-3 text-base border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                                        placeholder="R$ 0,00"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-
-
-                <div className="flex justify-center p-6 gap-2">
-                    <button
-                        type="button"
-                        onClick={() => loadingData()}
-                        className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
-                    >
-                        <span className="flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                            Processar
-                        </span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => sendData()}
-                        className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition duration-150 ease-in-out hover:scale-105"
-                    >
-                        <span className="flex items-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                            Enviar CT-e
-                        </span>
-                    </button>
-
-
-                </div>
-            </form>
+          <Select
+            containerClassName="w-full md:w-56"
+            value={tipoVeiculo || '50'}
+            onChange={(e) => {
+              const valorSelecionado = e.target.value as '14' | '19' | '27_30' | '32_35' | '38_40' | '50';
+              setTipoVeiculo(valorSelecionado);
+              calcularAposEscolherVipoDeCaminha(dadosXML.saida.city, dadosXML.saida.uf, dadosXML.destino.city, dadosXML.destino.uf, Number(dadosXML.quantidadeCarga), valorSelecionado)
+            }}
+          >
+            <option disabled>Tipo de Veículo</option>
+            <option value="14">14 TON</option>
+            <option value="19">19 TON</option>
+            <option value="27_30">27-30 TON</option>
+            <option value="32_35">32-35 TON</option>
+            <option value="38_40">38-40 TON</option>
+            <option value="50">50 TON</option>
+          </Select>
         </div>
-    )
+
+        <form className="space-y-6">
+          {tab === "identificação" && (
+            <div className="space-y-6">
+              <Card>
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
+                  <Users className="h-5 w-5 text-brand-600" />
+                  Dados das Partes
+                </h2>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <Input
+                      label="Remetente CPF/CNPJ"
+                      value={dadosXML.cpfCnpjRemetente}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        formatarCpfCnpj(e.target.value, 'Remetente');
+                      }}
+                      placeholder="00.000.000/0000-00"
+                    />
+                    <span className="text-sm text-slate-500">{rementName}</span>
+                  </div>
+                  <div>
+                    <Input
+                      label="Destinatário CPF/CNPJ"
+                      value={dadosXML.cpfCnpjDestinatario}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        setDadosXML({ ...dadosXML, cpfCnpjDestinatario: formatarCpfCnpj(e.target.value, 'destinatario') });
+                      }}
+                      placeholder="00.000.000/0000-00"
+                    />
+                    <span className="text-sm text-slate-500">{destName}</span>
+
+                    {destinatarioNaoEncontrado && (
+                      <Card className="mt-4 border-warning-200" padded={false}>
+                        <div className="rounded-t-2xl bg-gradient-to-r from-warning-500 to-warning-600 px-6 py-4">
+                          <h3 className="text-lg font-semibold text-white">Destinatário não encontrado</h3>
+                          <p className="mt-1 text-sm text-warning-50">Preencha os dados abaixo para cadastrar um novo destinatário.</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
+                          <Input
+                            label="Nome / Inscrição Estadual"
+                            value={dadosXML.nome_destinatario}
+                            onChange={(e) => setDadosXML({ ...dadosXML, nome_destinatario: e.target.value })}
+                            placeholder="Nome ou Inscrição Estadual"
+                          />
+                          <Input
+                            type="email"
+                            label="E-mail"
+                            value={dadosXML.email_destinatario}
+                            onChange={(e) => setDadosXML({ ...dadosXML, email_destinatario: e.target.value })}
+                            placeholder="email@empresa.com"
+                          />
+                          <Input
+                            label="Telefone"
+                            value={dadosXML.fone_destinatario}
+                            onChange={(e) => setDadosXML({ ...dadosXML, fone_destinatario: e.target.value })}
+                            placeholder="(99) 99999-9999"
+                          />
+                          <Input
+                            label="Cidade"
+                            value={dadosXML.cidade_destinatario}
+                            onChange={(e) => setDadosXML({ ...dadosXML, cidade_destinatario: e.target.value })}
+                            placeholder="Cidade"
+                          />
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              <Card>
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
+                  <Package className="h-5 w-5 text-brand-600" />
+                  Dados da Carga
+                </h2>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <Input
+                    label="Produto predominante"
+                    value={dadosXML.produtoPredominante}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadosXML({ ...dadosXML, produtoPredominante: e.target.value })}
+                    placeholder="Ex: Fio, Tecido, etc."
+                  />
+                  <Input
+                    label="Valor da carga"
+                    value={`R$ ${dadosXML.valorCarga}`}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadosXML({ ...dadosXML, valorCarga: e.target.value })}
+                    placeholder="R$ 0,00"
+                  />
+                  <Input
+                    label="Quantidade carga"
+                    value={dadosXML.quantidadeCarga}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const value = e.target.value.replace('.', '').replace(',', '.');
+                      setDadosXML({ ...dadosXML, quantidadeCarga: value });
+                    }}
+                    placeholder="0,00"
+                  />
+                  <Input
+                    label="Valor serviço / Receber"
+                    value={dadosXML.valorServico}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadosXML({ ...dadosXML, valorServico: parseFloat(e.target.value) })}
+                    placeholder="R$ 0,00"
+                  />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {tab === "Comp/Tributos" && (
+            <div className="space-y-6">
+              <Card>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <Input
+                      label="Veículo Tração ( PLACA )"
+                      value={dadosXML.placaVeiculoTração}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadosXML({ ...dadosXML, placaVeiculoTração: e.target.value })}
+                      placeholder="ABC-1234"
+                    />
+                    <span className="text-sm text-slate-500">{veicName}</span>
+                  </div>
+                  <div>
+                    <Input
+                      label="Motorista ( CPF )"
+                      value={formatarCpfCnpj(dadosXML.cpf_motorista, 'cpf_motorista')}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDadosXML({ ...dadosXML, cpf_motorista: e.target.value })}
+                      placeholder="000.000.000-00"
+                    />
+                    <span className="text-sm text-slate-500">{driverName}</span>
+                  </div>
+                </div>
+              </Card>
+              <Card>
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
+                  <Percent className="h-5 w-5 text-brand-600" />
+                  Dados da Carga
+                </h2>
+                <Input
+                  label="Valor do ICMS ( 12 %)"
+                  value={dadosXML.valorICMS}
+                  onChange={(e) => setDadosXML({ ...dadosXML, valorICMS: e.target.value })}
+                />
+              </Card>
+            </div>
+          )}
+
+          {tab === "documentos" && (
+            <div className="space-y-6">
+              <Card>
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
+                  <FileCode2 className="h-5 w-5 text-brand-600" />
+                  Documentos Fiscais
+                </h2>
+                <div className="space-y-4">
+                  {dadosXML && dadosXML.DOCNFE.length > 0 && dadosXML.DOCNFE.map((doc, index) => (
+                    <div key={doc.chaveNotaFiscal || index} className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      <Input
+                        label="Número da Nota Fiscal"
+                        value={doc.numeroNotaFiscal}
+                        onChange={(e) => {
+                          setDadosXML({
+                            ...dadosXML,
+                            DOCNFE: dadosXML.DOCNFE.map((item, i) =>
+                              i === index ? { ...item, numeroNotaFiscal: e.target.value } : item
+                            )
+                          });
+                        }}
+                        placeholder="000000000"
+                      />
+                      <Input
+                        label="Chave da Nota Fiscal"
+                        value={doc.chaveNotaFiscal}
+                        onChange={(e) => {
+                          setDadosXML({
+                            ...dadosXML,
+                            DOCNFE: dadosXML.DOCNFE.map((item, i) =>
+                              i === index ? { ...item, chaveNotaFiscal: e.target.value } : item
+                            )
+                          });
+                        }}
+                        placeholder="Chave de 44 dígitos"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {tab === 'Reforma Tributária' && (
+            <div className="space-y-6">
+              <Card>
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-slate-800">
+                  <Landmark className="h-5 w-5 text-brand-600" />
+                  Contribuições da Reforma Tributária
+                </h2>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                  <Input
+                    label="v. BC IBS/CBS ( serviço )"
+                    value={dadosXML.valorServico}
+                    onChange={(e) => {
+                      const value = e.target.value.replace('R$', '').replace(',', '.').trim();
+                      setDadosXML({ ...dadosXML, valorServico: parseFloat(value) || 0 });
+                    }}
+                    placeholder="R$ 0,00"
+                  />
+                  <Input
+                    label="v IBS"
+                    value={dadosXML.valorIBS || ''}
+                    onChange={(e) => setDadosXML({ ...dadosXML, valorIBS: e.target.value })}
+                    placeholder="R$ 0,00"
+                  />
+                  <Input
+                    label="v. CBS"
+                    value={cteSelecionado.IBSCBS?.vCBS}
+                    onChange={(e) => {
+                      const value = e.target.value.replace('%', '').replace(',', '.').trim();
+                      setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vCBS: parseFloat(value) || 0 } });
+                    }}
+                    placeholder="0,00%"
+                  />
+                  <Input
+                    label="v. IBS UF / v. IBS ( 0.1% )"
+                    value={cteSelecionado.IBSCBS?.vIBS}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(',', '.').trim();
+                      setCteSelecionado({ ...cteSelecionado, IBSCBS: { ...cteSelecionado.IBSCBS, vIBS: parseFloat(value) || 0 } });
+                    }}
+                    placeholder="R$ 0,00"
+                  />
+                </div>
+              </Card>
+            </div>
+          )}
+
+          <div className="flex justify-center gap-3 p-2">
+            <Button
+              type="button"
+              variant="success"
+              icon={<RefreshCw className="h-4 w-4" />}
+              loading={processando}
+              onClick={() => loadingData()}
+            >
+              Processar
+            </Button>
+            <Button
+              type="button"
+              variant="success"
+              icon={<Send className="h-4 w-4" />}
+              loading={enviando}
+              onClick={() => sendData()}
+            >
+              Enviar CT-e
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }

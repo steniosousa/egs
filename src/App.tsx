@@ -1,17 +1,28 @@
-import axios from "axios";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { carregarTabela } from "./tabelaMatrix";
 import { toast } from 'react-toastify';
-import CRLVView from "./pages/crlv";
+import { Building2, FileCode2, FileText, LogOut, Wifi } from "lucide-react";
 import { AppProvider, useApp } from "./context/AppContext";
-import CTEView from "./pages/cte";
-import CRIAR from "./pages/criar";
+import { listarCtes, buscarCtePorId, CteListItem } from "./services/cteService";
+import { logoutEmpresa } from "./services/authService";
+import { Button, Spinner, Tabs, TabItem } from "./components/ui";
+
+const CRLVView = lazy(() => import("./pages/crlv"));
+const CRIAR = lazy(() => import("./pages/criar"));
+const CTEView = lazy(() => import("./pages/cte"));
+
+type MainTab = 'crlv' | 'xml';
+
+const MAIN_TABS: TabItem<MainTab>[] = [
+  { value: 'crlv', label: 'CRLV', icon: FileText },
+  { value: 'xml', label: 'XML / CT-e', icon: FileCode2 },
+];
 
 function AppContent() {
   const { empresa, limparDados, getToken, cteSelecionado, setCteSelecionado, loading, setLoading } = useApp();
   const token = localStorage.getItem('token');
-  const [tab, setTab] = useState<'crlv' | 'xml'>('crlv');
-  const [ctes, setCtes] = useState<{ REM_NOME: string, DATACREATE: string, IDCTE: number, NOMECIDADEEMISSAO: string, NOMECIDADEFIMSERV: string }[]>([])
+  const [tab, setTab] = useState<MainTab>('crlv');
+  const [ctes, setCtes] = useState<CteListItem[]>([])
 
   const getCTES = useCallback(async () => {
     if (!empresa) {
@@ -20,14 +31,8 @@ function AppContent() {
     }
 
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//odata/CTe?%24orderby=NUMCTE%20desc&%24top=40&%24count=true`,
-        {
-          headers: {
-            Authorization: `Bearer ${empresa.token}`
-          }
-        }
-      )
-      setCtes(data.value)
+      const data = await listarCtes(empresa)
+      setCtes(data)
     } catch (e) {
       toast.error("Erro ao recuperar CTES")
     }
@@ -39,14 +44,7 @@ function AppContent() {
       return
     }
     try {
-      const { data } = await axios.get(`https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}//api/CteApi/GetCTe?IDCTE=${id}&CODEMPRESA=1&MODELODOC=57&OPERACAO=COPIA`,
-        {
-          headers: {
-            Authorization: `Bearer ${empresa.token}`
-          }
-        }
-      )
-
+      const data = await buscarCtePorId(empresa, id)
       setCteSelecionado(data)
     } catch (e) {
       toast.error("Erro ao recuperar a nota escolhida")
@@ -62,16 +60,7 @@ function AppContent() {
       return
     }
     try {
-      await axios.post(
-        `https://api.egssistemas.com.br/${empresa.name === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/api/Sistema/PostSair`,
-        null,
-        {
-          headers: {
-            Authorization: `Bearer ${empresa.token}`
-          },
-          withCredentials: true
-        }
-      );
+      await logoutEmpresa(empresa);
       limparDados()
       localStorage.clear()
     } catch {
@@ -90,111 +79,72 @@ function AppContent() {
       setLoading(true)
       try {
         await carregarTabela();
-
       } catch (e) {
         toast.error("Erro ao carregar tabela")
       } finally {
         setLoading(false)
       }
-
     };
 
     loadTabela();
   }, [setLoading]);
 
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-        <div className="flex w-full max-w-lg bg-white p-1.5 rounded-2xl shadow-lg border border-gray-200">
-          <button
-            onClick={async () => await getToken("GADELOG")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa && empresa.name === "GADELOG"
-              ? "bg-blue-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-              }`}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-            Gadelog
-          </button>
-
-          <button
-            onClick={async () => await getToken("INTERMEDIUM")}
-            className={`flex-1 flex items-center justify-center gap-3 px-5 py-3 rounded-xl font-semibold transition-all duration-300 ${empresa && empresa.name === "INTERMEDIUM"
-              ? "bg-emerald-600 text-white shadow-md"
-              : "text-gray-600 hover:bg-gray-100"
-              }`}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Intermedium
-          </button>
-        </div>
-        {loading &&
-          <div className="flex items-center justify-center flex-col">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p>Carregando...</p>
+    <div className="min-h-screen">
+      <header className="border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-card">
+              <Wifi className="h-5 w-5" strokeWidth={2.25} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">Any ESG</p>
+              <p className="text-xs text-slate-400">Gestão de CT-e, CRLV e documentos</p>
+            </div>
           </div>
-        }
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTab('crlv')}
-            className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'crlv'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            CRLV
-          </button>
 
-          <button
-            onClick={() => setTab('xml')}
-            className={`px-5 py-3 rounded-xl font-semibold transition-all duration-200 ${tab === 'xml'
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            XML
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex rounded-xl border border-slate-200 bg-slate-100/70 p-1">
+              <button
+                onClick={async () => await getToken("GADELOG")}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${empresa && empresa.name === "GADELOG"
+                  ? "bg-white text-brand-700 shadow-card"
+                  : "text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <Building2 className="h-4 w-4" strokeWidth={2.25} />
+                Gadelog
+              </button>
+              <button
+                onClick={async () => await getToken("INTERMEDIUM")}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${empresa && empresa.name === "INTERMEDIUM"
+                  ? "bg-white text-brand-700 shadow-card"
+                  : "text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                <Building2 className="h-4 w-4" strokeWidth={2.25} />
+                Intermedium
+              </button>
+            </div>
+
+            {loading && <Spinner size="sm" />}
+
+            <Tabs items={MAIN_TABS} value={tab} onChange={setTab} />
+
+            <Button variant="secondary" size="sm" icon={<LogOut className="h-4 w-4" />} onClick={sair}>
+              Sair
+            </Button>
+          </div>
         </div>
-        <button
-          onClick={sair}
-          className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg"
-        >
-          Sair
-        </button>
-      </div>
+      </header>
 
-      <div className="max-w-3x4 mx-auto">
-        <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <Suspense fallback={<div className="flex justify-center py-16"><Spinner label="Carregando módulo..." /></div>}>
           {tab === 'crlv' && <CRLVView />}
           {tab === 'xml' && !cteSelecionado && <CTEView ctes={ctes} buscarCteEscolhida={buscarCteEscolhida} />}
           {tab === 'xml' && cteSelecionado && <CRIAR />}
-        </div>
-      </div>
+        </Suspense>
+      </main>
     </div>
   );
 }
