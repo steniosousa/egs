@@ -17,8 +17,8 @@ export async function loginEmpresa(url: EmpresaUrl): Promise<TokenResponse> {
   params.append('captcha', '');
   params.append('codigo2fa', '');
   params.append('grant_type', 'password');
-  params.append('username', url === "GADELOG" ? "SAMILA" : 'FINANCEIRO');
-  params.append('password', url === "GADELOG" ? "Gadelog2026*" : 'inter2026');
+  params.append('username', url === "GADELOG" ? "HENRIQUE" : 'FINANCEIRO');
+  params.append('password', url === "GADELOG" ? "291546" : 'inter2026');
 
   const tokenData: { data: TokenResponse } = await axios.post(`${API_ROOT}/${url === "GADELOG" ? "EGSAPP4" : "EGSCTE"}/token`, params, {
     headers: {
